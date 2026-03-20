@@ -28,7 +28,8 @@ export async function generateImageBuffer(
     prompt,
     size,
   });
-  const base64 = response.data[0]?.b64_json ?? "";
+  const item = response.data?.[0];
+  const base64 = (item && "b64_json" in item ? item.b64_json : null) ?? "";
   return Buffer.from(base64, "base64");
 }
 
@@ -51,7 +52,8 @@ export async function editImages(
     prompt,
   });
 
-  const imageBase64 = response.data[0]?.b64_json ?? "";
+  const editItem = response.data?.[0];
+  const imageBase64 = (editItem && "b64_json" in editItem ? editItem.b64_json : null) ?? "";
   const imageBytes = Buffer.from(imageBase64, "base64");
 
   if (outputPath) {
