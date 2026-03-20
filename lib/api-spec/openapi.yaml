@@ -10,6 +10,8 @@ servers:
 tags:
   - name: health
     description: Health operations
+  - name: fusion
+    description: Game fusion operations
 paths:
   /healthz:
     get:
@@ -24,6 +26,118 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /fusion/fetch-repo:
+    post:
+      operationId: fetchRepo
+      tags: [fusion]
+      summary: Fetch GitHub repository
+      description: Fetches the file tree and key source files from a public GitHub repository
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FetchRepoBody"
+      responses:
+        "200":
+          description: Repository fetched successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RepoData"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: Repository not accessible or too large
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /fusion/analyze:
+    post:
+      operationId: analyzeRepo
+      tags: [fusion]
+      summary: Analyze a game repository
+      description: Uses AI to classify files into visual layer and logic layer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeRepoBody"
+      responses:
+        "200":
+          description: Analysis complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalysisResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /fusion/fuse:
+    post:
+      operationId: fuseGames
+      tags: [fusion]
+      summary: Fuse two games
+      description: Combines visual layer from Game A with logic layer from Game B using AI to create a new hybrid game
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FuseGamesBody"
+      responses:
+        "200":
+          description: Fusion complete
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FusionResult"
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /fusion/download:
+    post:
+      operationId: downloadFusedGame
+      tags: [fusion]
+      summary: Download fused game as ZIP
+      description: Packages the fused game files into a ZIP archive for download
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DownloadBody"
+      responses:
+        "200":
+          description: ZIP file
+          content:
+            application/zip:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +148,216 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    FetchRepoBody:
+      type: object
+      properties:
+        repoUrl:
+          type: string
+          description: GitHub repository URL (e.g. https://github.com/owner/repo)
+      required:
+        - repoUrl
+
+    RepoFile:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        size:
+          type: integer
+        type:
+          type: string
+          enum: [file, dir]
+      required:
+        - path
+        - type
+        - size
+
+    RepoData:
+      type: object
+      properties:
+        owner:
+          type: string
+        repo:
+          type: string
+        defaultBranch:
+          type: string
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepoFile"
+        totalFiles:
+          type: integer
+        fetchedFiles:
+          type: integer
+        description:
+          type: ["string", "null"]
+      required:
+        - owner
+        - repo
+        - defaultBranch
+        - files
+        - totalFiles
+        - fetchedFiles
+
+    AnalyzeRepoBody:
+      type: object
+      properties:
+        repoData:
+          $ref: "#/components/schemas/RepoData"
+        role:
+          type: string
+          enum: [graphics, logic]
+          description: Whether this repo will contribute graphics or logic to the fusion
+      required:
+        - repoData
+        - role
+
+    FileCategory:
+      type: object
+      properties:
+        path:
+          type: string
+        category:
+          type: string
+          enum: [visual, logic, asset, config, other]
+        reason:
+          type: string
+        content:
+          type: ["string", "null"]
+      required:
+        - path
+        - category
+        - reason
+
+    GameArchitecture:
+      type: object
+      properties:
+        renderingEngine:
+          type: ["string", "null"]
+          description: Detected rendering engine (canvas2d, three.js, phaser, pixi, webgl, etc.)
+        gameGenre:
+          type: ["string", "null"]
+          description: Detected game genre
+        summary:
+          type: string
+          description: High-level description of the game
+        visualFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileCategory"
+        logicFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileCategory"
+        assetFiles:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileCategory"
+      required:
+        - summary
+        - visualFiles
+        - logicFiles
+        - assetFiles
+
+    AnalysisResult:
+      type: object
+      properties:
+        architecture:
+          $ref: "#/components/schemas/GameArchitecture"
+        warnings:
+          type: array
+          items:
+            type: string
+      required:
+        - architecture
+        - warnings
+
+    FuseGamesBody:
+      type: object
+      properties:
+        gameA:
+          description: Game A providing visuals and world/level design
+          type: object
+          properties:
+            repoData:
+              $ref: "#/components/schemas/RepoData"
+            analysis:
+              $ref: "#/components/schemas/AnalysisResult"
+          required:
+            - repoData
+            - analysis
+        gameB:
+          description: Game B providing game logic and mechanics
+          type: object
+          properties:
+            repoData:
+              $ref: "#/components/schemas/RepoData"
+            analysis:
+              $ref: "#/components/schemas/AnalysisResult"
+          required:
+            - repoData
+            - analysis
+      required:
+        - gameA
+        - gameB
+
+    GeneratedFile:
+      type: object
+      properties:
+        path:
+          type: string
+        content:
+          type: string
+        description:
+          type: string
+      required:
+        - path
+        - content
+        - description
+
+    FusionResult:
+      type: object
+      properties:
+        files:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedFile"
+        summary:
+          type: string
+          description: Description of what was combined and how
+        warnings:
+          type: array
+          items:
+            type: string
+        compatibilityScore:
+          type: integer
+          description: 0-100 score indicating how well the two games could be merged
+      required:
+        - files
+        - summary
+        - warnings
+        - compatibilityScore
+
+    DownloadBody:
+      type: object
+      properties:
+        fusionResult:
+          $ref: "#/components/schemas/FusionResult"
+        gameAName:
+          type: string
+        gameBName:
+          type: string
+      required:
+        - fusionResult
+        - gameAName
+        - gameBName

@@ -6,4 +6,21 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./analysisResult";
+export * from "./analyzeRepoBody";
+export * from "./analyzeRepoBodyRole";
+export * from "./downloadBody";
+export * from "./errorResponse";
+export * from "./fetchRepoBody";
+export * from "./fileCategory";
+export * from "./fileCategoryCategory";
+export * from "./fuseGamesBody";
+export * from "./fuseGamesBodyGameA";
+export * from "./fuseGamesBodyGameB";
+export * from "./fusionResult";
+export * from "./gameArchitecture";
+export * from "./generatedFile";
 export * from "./healthStatus";
+export * from "./repoData";
+export * from "./repoFile";
+export * from "./repoFileType";

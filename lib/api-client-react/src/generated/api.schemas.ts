@@ -8,3 +8,140 @@
 export interface HealthStatus {
   status: string;
 }
+
+export interface ErrorResponse {
+  error: string;
+}
+
+export interface FetchRepoBody {
+  /** GitHub repository URL (e.g. https://github.com/owner/repo) */
+  repoUrl: string;
+}
+
+export type RepoFileType = (typeof RepoFileType)[keyof typeof RepoFileType];
+
+export const RepoFileType = {
+  file: "file",
+  dir: "dir",
+} as const;
+
+export interface RepoFile {
+  path: string;
+  content?: string;
+  size: number;
+  type: RepoFileType;
+}
+
+export interface RepoData {
+  owner: string;
+  repo: string;
+  defaultBranch: string;
+  files: RepoFile[];
+  totalFiles: number;
+  fetchedFiles: number;
+  /** @nullable */
+  description?: string | null;
+}
+
+/**
+ * Whether this repo will contribute graphics or logic to the fusion
+ */
+export type AnalyzeRepoBodyRole =
+  (typeof AnalyzeRepoBodyRole)[keyof typeof AnalyzeRepoBodyRole];
+
+export const AnalyzeRepoBodyRole = {
+  graphics: "graphics",
+  logic: "logic",
+} as const;
+
+export interface AnalyzeRepoBody {
+  repoData: RepoData;
+  /** Whether this repo will contribute graphics or logic to the fusion */
+  role: AnalyzeRepoBodyRole;
+}
+
+export type FileCategoryCategory =
+  (typeof FileCategoryCategory)[keyof typeof FileCategoryCategory];
+
+export const FileCategoryCategory = {
+  visual: "visual",
+  logic: "logic",
+  asset: "asset",
+  config: "config",
+  other: "other",
+} as const;
+
+export interface FileCategory {
+  path: string;
+  category: FileCategoryCategory;
+  reason: string;
+  /** @nullable */
+  content?: string | null;
+}
+
+export interface GameArchitecture {
+  /**
+   * Detected rendering engine (canvas2d, three.js, phaser, pixi, webgl, etc.)
+   * @nullable
+   */
+  renderingEngine?: string | null;
+  /**
+   * Detected game genre
+   * @nullable
+   */
+  gameGenre?: string | null;
+  /** High-level description of the game */
+  summary: string;
+  visualFiles: FileCategory[];
+  logicFiles: FileCategory[];
+  assetFiles: FileCategory[];
+}
+
+export interface AnalysisResult {
+  architecture: GameArchitecture;
+  warnings: string[];
+}
+
+/**
+ * Game A providing visuals and world/level design
+ */
+export type FuseGamesBodyGameA = {
+  repoData: RepoData;
+  analysis: AnalysisResult;
+};
+
+/**
+ * Game B providing game logic and mechanics
+ */
+export type FuseGamesBodyGameB = {
+  repoData: RepoData;
+  analysis: AnalysisResult;
+};
+
+export interface FuseGamesBody {
+  /** Game A providing visuals and world/level design */
+  gameA: FuseGamesBodyGameA;
+  /** Game B providing game logic and mechanics */
+  gameB: FuseGamesBodyGameB;
+}
+
+export interface GeneratedFile {
+  path: string;
+  content: string;
+  description: string;
+}
+
+export interface FusionResult {
+  files: GeneratedFile[];
+  /** Description of what was combined and how */
+  summary: string;
+  warnings: string[];
+  /** 0-100 score indicating how well the two games could be merged */
+  compatibilityScore: number;
+}
+
+export interface DownloadBody {
+  fusionResult: FusionResult;
+  gameAName: string;
+  gameBName: string;
+}

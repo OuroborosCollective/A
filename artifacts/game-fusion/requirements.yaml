@@ -1,0 +1,17 @@
+packages:
+  "framer-motion": "For premium smooth animations, panel sliding, and cyber tech UI transitions"
+  "clsx": "For conditional tailwind class names"
+  "tailwind-merge": "For merging tailwind classes safely"
+  "@radix-ui/react-toast": "For elegant error and success notifications"
+
+images:
+  - path: "artifacts/game-fusion/public/images/tech-bg.png"
+    description: "Dark professional tech background, subtle deep blue and purple geometric grid, slight neon cyan ambient light leak, minimal, clean cyberpunk interface aesthetic"
+    aspect_ratio: "16:9"
+  - path: "artifacts/game-fusion/public/images/fusion-core.png"
+    description: "Abstract glowing orb core, electric neon magenta and cyan energy interplay, high tech UI element, highly detailed but suitable for overlay on dark background"
+    aspect_ratio: "1:1"
+
+notes:
+  - "Assuming @workspace/api-client-react exports the Orval generated hooks."
+  - "The app relies heavily on dark mode and glowing box-shadows."

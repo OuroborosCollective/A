@@ -14,3 +14,293 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * Fetches the file tree and key source files from a public GitHub repository
+ * @summary Fetch GitHub repository
+ */
+export const FetchRepoBody = zod.object({
+  repoUrl: zod
+    .string()
+    .describe("GitHub repository URL (e.g. https:\/\/github.com\/owner\/repo)"),
+});
+
+export const FetchRepoResponse = zod.object({
+  owner: zod.string(),
+  repo: zod.string(),
+  defaultBranch: zod.string(),
+  files: zod.array(
+    zod.object({
+      path: zod.string(),
+      content: zod.string().optional(),
+      size: zod.number(),
+      type: zod.enum(["file", "dir"]),
+    }),
+  ),
+  totalFiles: zod.number(),
+  fetchedFiles: zod.number(),
+  description: zod.string().nullish(),
+});
+
+/**
+ * Uses AI to classify files into visual layer and logic layer
+ * @summary Analyze a game repository
+ */
+export const AnalyzeRepoBody = zod.object({
+  repoData: zod.object({
+    owner: zod.string(),
+    repo: zod.string(),
+    defaultBranch: zod.string(),
+    files: zod.array(
+      zod.object({
+        path: zod.string(),
+        content: zod.string().optional(),
+        size: zod.number(),
+        type: zod.enum(["file", "dir"]),
+      }),
+    ),
+    totalFiles: zod.number(),
+    fetchedFiles: zod.number(),
+    description: zod.string().nullish(),
+  }),
+  role: zod
+    .enum(["graphics", "logic"])
+    .describe(
+      "Whether this repo will contribute graphics or logic to the fusion",
+    ),
+});
+
+export const AnalyzeRepoResponse = zod.object({
+  architecture: zod.object({
+    renderingEngine: zod
+      .string()
+      .nullish()
+      .describe(
+        "Detected rendering engine (canvas2d, three.js, phaser, pixi, webgl, etc.)",
+      ),
+    gameGenre: zod.string().nullish().describe("Detected game genre"),
+    summary: zod.string().describe("High-level description of the game"),
+    visualFiles: zod.array(
+      zod.object({
+        path: zod.string(),
+        category: zod.enum(["visual", "logic", "asset", "config", "other"]),
+        reason: zod.string(),
+        content: zod.string().nullish(),
+      }),
+    ),
+    logicFiles: zod.array(
+      zod.object({
+        path: zod.string(),
+        category: zod.enum(["visual", "logic", "asset", "config", "other"]),
+        reason: zod.string(),
+        content: zod.string().nullish(),
+      }),
+    ),
+    assetFiles: zod.array(
+      zod.object({
+        path: zod.string(),
+        category: zod.enum(["visual", "logic", "asset", "config", "other"]),
+        reason: zod.string(),
+        content: zod.string().nullish(),
+      }),
+    ),
+  }),
+  warnings: zod.array(zod.string()),
+});
+
+/**
+ * Combines visual layer from Game A with logic layer from Game B using AI to create a new hybrid game
+ * @summary Fuse two games
+ */
+export const FuseGamesBody = zod.object({
+  gameA: zod
+    .object({
+      repoData: zod.object({
+        owner: zod.string(),
+        repo: zod.string(),
+        defaultBranch: zod.string(),
+        files: zod.array(
+          zod.object({
+            path: zod.string(),
+            content: zod.string().optional(),
+            size: zod.number(),
+            type: zod.enum(["file", "dir"]),
+          }),
+        ),
+        totalFiles: zod.number(),
+        fetchedFiles: zod.number(),
+        description: zod.string().nullish(),
+      }),
+      analysis: zod.object({
+        architecture: zod.object({
+          renderingEngine: zod
+            .string()
+            .nullish()
+            .describe(
+              "Detected rendering engine (canvas2d, three.js, phaser, pixi, webgl, etc.)",
+            ),
+          gameGenre: zod.string().nullish().describe("Detected game genre"),
+          summary: zod.string().describe("High-level description of the game"),
+          visualFiles: zod.array(
+            zod.object({
+              path: zod.string(),
+              category: zod.enum([
+                "visual",
+                "logic",
+                "asset",
+                "config",
+                "other",
+              ]),
+              reason: zod.string(),
+              content: zod.string().nullish(),
+            }),
+          ),
+          logicFiles: zod.array(
+            zod.object({
+              path: zod.string(),
+              category: zod.enum([
+                "visual",
+                "logic",
+                "asset",
+                "config",
+                "other",
+              ]),
+              reason: zod.string(),
+              content: zod.string().nullish(),
+            }),
+          ),
+          assetFiles: zod.array(
+            zod.object({
+              path: zod.string(),
+              category: zod.enum([
+                "visual",
+                "logic",
+                "asset",
+                "config",
+                "other",
+              ]),
+              reason: zod.string(),
+              content: zod.string().nullish(),
+            }),
+          ),
+        }),
+        warnings: zod.array(zod.string()),
+      }),
+    })
+    .describe("Game A providing visuals and world\/level design"),
+  gameB: zod
+    .object({
+      repoData: zod.object({
+        owner: zod.string(),
+        repo: zod.string(),
+        defaultBranch: zod.string(),
+        files: zod.array(
+          zod.object({
+            path: zod.string(),
+            content: zod.string().optional(),
+            size: zod.number(),
+            type: zod.enum(["file", "dir"]),
+          }),
+        ),
+        totalFiles: zod.number(),
+        fetchedFiles: zod.number(),
+        description: zod.string().nullish(),
+      }),
+      analysis: zod.object({
+        architecture: zod.object({
+          renderingEngine: zod
+            .string()
+            .nullish()
+            .describe(
+              "Detected rendering engine (canvas2d, three.js, phaser, pixi, webgl, etc.)",
+            ),
+          gameGenre: zod.string().nullish().describe("Detected game genre"),
+          summary: zod.string().describe("High-level description of the game"),
+          visualFiles: zod.array(
+            zod.object({
+              path: zod.string(),
+              category: zod.enum([
+                "visual",
+                "logic",
+                "asset",
+                "config",
+                "other",
+              ]),
+              reason: zod.string(),
+              content: zod.string().nullish(),
+            }),
+          ),
+          logicFiles: zod.array(
+            zod.object({
+              path: zod.string(),
+              category: zod.enum([
+                "visual",
+                "logic",
+                "asset",
+                "config",
+                "other",
+              ]),
+              reason: zod.string(),
+              content: zod.string().nullish(),
+            }),
+          ),
+          assetFiles: zod.array(
+            zod.object({
+              path: zod.string(),
+              category: zod.enum([
+                "visual",
+                "logic",
+                "asset",
+                "config",
+                "other",
+              ]),
+              reason: zod.string(),
+              content: zod.string().nullish(),
+            }),
+          ),
+        }),
+        warnings: zod.array(zod.string()),
+      }),
+    })
+    .describe("Game B providing game logic and mechanics"),
+});
+
+export const FuseGamesResponse = zod.object({
+  files: zod.array(
+    zod.object({
+      path: zod.string(),
+      content: zod.string(),
+      description: zod.string(),
+    }),
+  ),
+  summary: zod.string().describe("Description of what was combined and how"),
+  warnings: zod.array(zod.string()),
+  compatibilityScore: zod
+    .number()
+    .describe("0-100 score indicating how well the two games could be merged"),
+});
+
+/**
+ * Packages the fused game files into a ZIP archive for download
+ * @summary Download fused game as ZIP
+ */
+export const DownloadFusedGameBody = zod.object({
+  fusionResult: zod.object({
+    files: zod.array(
+      zod.object({
+        path: zod.string(),
+        content: zod.string(),
+        description: zod.string(),
+      }),
+    ),
+    summary: zod.string().describe("Description of what was combined and how"),
+    warnings: zod.array(zod.string()),
+    compatibilityScore: zod
+      .number()
+      .describe(
+        "0-100 score indicating how well the two games could be merged",
+      ),
+  }),
+  gameAName: zod.string(),
+  gameBName: zod.string(),
+});

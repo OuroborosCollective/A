@@ -5,18 +5,31 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import type {
+  MutationFunction,
   QueryFunction,
   QueryKey,
+  UseMutationOptions,
+  UseMutationResult,
   UseQueryOptions,
   UseQueryResult,
 } from "@tanstack/react-query";
 
-import type { HealthStatus } from "./api.schemas";
+import type {
+  AnalysisResult,
+  AnalyzeRepoBody,
+  DownloadBody,
+  ErrorResponse,
+  FetchRepoBody,
+  FuseGamesBody,
+  FusionResult,
+  HealthStatus,
+  RepoData,
+} from "./api.schemas";
 
 import { customFetch } from "../custom-fetch";
-import type { ErrorType } from "../custom-fetch";
+import type { ErrorType, BodyType } from "../custom-fetch";
 
 type AwaitedInput<T> = PromiseLike<T> | T;
 
@@ -99,3 +112,351 @@ export function useHealthCheck<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * Fetches the file tree and key source files from a public GitHub repository
+ * @summary Fetch GitHub repository
+ */
+export const getFetchRepoUrl = () => {
+  return `/api/fusion/fetch-repo`;
+};
+
+export const fetchRepo = async (
+  fetchRepoBody: FetchRepoBody,
+  options?: RequestInit,
+): Promise<RepoData> => {
+  return customFetch<RepoData>(getFetchRepoUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fetchRepoBody),
+  });
+};
+
+export const getFetchRepoMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fetchRepo>>,
+    TError,
+    { data: BodyType<FetchRepoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof fetchRepo>>,
+  TError,
+  { data: BodyType<FetchRepoBody> },
+  TContext
+> => {
+  const mutationKey = ["fetchRepo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof fetchRepo>>,
+    { data: BodyType<FetchRepoBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return fetchRepo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type FetchRepoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof fetchRepo>>
+>;
+export type FetchRepoMutationBody = BodyType<FetchRepoBody>;
+export type FetchRepoMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Fetch GitHub repository
+ */
+export const useFetchRepo = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fetchRepo>>,
+    TError,
+    { data: BodyType<FetchRepoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof fetchRepo>>,
+  TError,
+  { data: BodyType<FetchRepoBody> },
+  TContext
+> => {
+  return useMutation(getFetchRepoMutationOptions(options));
+};
+
+/**
+ * Uses AI to classify files into visual layer and logic layer
+ * @summary Analyze a game repository
+ */
+export const getAnalyzeRepoUrl = () => {
+  return `/api/fusion/analyze`;
+};
+
+export const analyzeRepo = async (
+  analyzeRepoBody: AnalyzeRepoBody,
+  options?: RequestInit,
+): Promise<AnalysisResult> => {
+  return customFetch<AnalysisResult>(getAnalyzeRepoUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(analyzeRepoBody),
+  });
+};
+
+export const getAnalyzeRepoMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeRepo>>,
+    TError,
+    { data: BodyType<AnalyzeRepoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof analyzeRepo>>,
+  TError,
+  { data: BodyType<AnalyzeRepoBody> },
+  TContext
+> => {
+  const mutationKey = ["analyzeRepo"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof analyzeRepo>>,
+    { data: BodyType<AnalyzeRepoBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return analyzeRepo(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AnalyzeRepoMutationResult = NonNullable<
+  Awaited<ReturnType<typeof analyzeRepo>>
+>;
+export type AnalyzeRepoMutationBody = BodyType<AnalyzeRepoBody>;
+export type AnalyzeRepoMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Analyze a game repository
+ */
+export const useAnalyzeRepo = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof analyzeRepo>>,
+    TError,
+    { data: BodyType<AnalyzeRepoBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof analyzeRepo>>,
+  TError,
+  { data: BodyType<AnalyzeRepoBody> },
+  TContext
+> => {
+  return useMutation(getAnalyzeRepoMutationOptions(options));
+};
+
+/**
+ * Combines visual layer from Game A with logic layer from Game B using AI to create a new hybrid game
+ * @summary Fuse two games
+ */
+export const getFuseGamesUrl = () => {
+  return `/api/fusion/fuse`;
+};
+
+export const fuseGames = async (
+  fuseGamesBody: FuseGamesBody,
+  options?: RequestInit,
+): Promise<FusionResult> => {
+  return customFetch<FusionResult>(getFuseGamesUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(fuseGamesBody),
+  });
+};
+
+export const getFuseGamesMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fuseGames>>,
+    TError,
+    { data: BodyType<FuseGamesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof fuseGames>>,
+  TError,
+  { data: BodyType<FuseGamesBody> },
+  TContext
+> => {
+  const mutationKey = ["fuseGames"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof fuseGames>>,
+    { data: BodyType<FuseGamesBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return fuseGames(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type FuseGamesMutationResult = NonNullable<
+  Awaited<ReturnType<typeof fuseGames>>
+>;
+export type FuseGamesMutationBody = BodyType<FuseGamesBody>;
+export type FuseGamesMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Fuse two games
+ */
+export const useFuseGames = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof fuseGames>>,
+    TError,
+    { data: BodyType<FuseGamesBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof fuseGames>>,
+  TError,
+  { data: BodyType<FuseGamesBody> },
+  TContext
+> => {
+  return useMutation(getFuseGamesMutationOptions(options));
+};
+
+/**
+ * Packages the fused game files into a ZIP archive for download
+ * @summary Download fused game as ZIP
+ */
+export const getDownloadFusedGameUrl = () => {
+  return `/api/fusion/download`;
+};
+
+export const downloadFusedGame = async (
+  downloadBody: DownloadBody,
+  options?: RequestInit,
+): Promise<Blob> => {
+  return customFetch<Blob>(getDownloadFusedGameUrl(), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(downloadBody),
+  });
+};
+
+export const getDownloadFusedGameMutationOptions = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof downloadFusedGame>>,
+    TError,
+    { data: BodyType<DownloadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof downloadFusedGame>>,
+  TError,
+  { data: BodyType<DownloadBody> },
+  TContext
+> => {
+  const mutationKey = ["downloadFusedGame"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof downloadFusedGame>>,
+    { data: BodyType<DownloadBody> }
+  > = (props) => {
+    const { data } = props ?? {};
+
+    return downloadFusedGame(data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type DownloadFusedGameMutationResult = NonNullable<
+  Awaited<ReturnType<typeof downloadFusedGame>>
+>;
+export type DownloadFusedGameMutationBody = BodyType<DownloadBody>;
+export type DownloadFusedGameMutationError = ErrorType<ErrorResponse>;
+
+/**
+ * @summary Download fused game as ZIP
+ */
+export const useDownloadFusedGame = <
+  TError = ErrorType<ErrorResponse>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof downloadFusedGame>>,
+    TError,
+    { data: BodyType<DownloadBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof downloadFusedGame>>,
+  TError,
+  { data: BodyType<DownloadBody> },
+  TContext
+> => {
+  return useMutation(getDownloadFusedGameMutationOptions(options));
+};
