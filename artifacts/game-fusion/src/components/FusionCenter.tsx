@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { CyberButton, CyberCard } from "./CyberUI";
 import { useFuseGames, useDownloadFusedGame } from "@/hooks/use-fusion";
-import { Loader2, Download, Zap, AlertTriangle, CheckCircle2 } from "lucide-react";
+import { Loader2, Download, Zap, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { motion, AnimatePresence } from "framer-motion";
 import { RepoState } from "@/pages/Home";
 import type { FusionResult } from "@workspace/api-client-react";
@@ -103,7 +104,21 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mb-10 text-left">
              <div className="bg-black/60 border border-white/10 p-6 rounded-xl flex flex-col justify-center">
-                <h3 className="text-sm font-mono text-primary font-bold uppercase mb-6 flex items-center gap-2"><Zap size={18}/> Compatibility Index</h3>
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-sm font-mono text-primary font-bold uppercase flex items-center gap-2">
+                    <Zap size={18}/> Compatibility Index
+                  </h3>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button className="text-primary/50 hover:text-primary transition-colors focus:outline-none" aria-label="About compatibility index">
+                        <Info size={16} />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>AI-calculated alignment between graphics and logic layers based on asset types, engine requirements, and file structures.</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
                 <div className="flex items-center gap-6">
                    <div className="relative w-24 h-24 flex items-center justify-center shrink-0">
                      <svg className="w-full h-full transform -rotate-90">
@@ -149,6 +164,7 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
             className="text-xl px-12 py-6 w-full md:w-auto flex items-center justify-center gap-4"
             onClick={handleDownload}
             disabled={isDownloading}
+            aria-label={isDownloading ? "Preparing your hybrid game download..." : "Download the compiled hybrid game archive"}
           >
             {isDownloading ? <Loader2 className="animate-spin" size={28} /> : <Download size={28} />}
             {isDownloading ? "PACKAGING ARCHIVE..." : "DOWNLOAD COMPILED HYBRID (ZIP)"}
@@ -181,6 +197,12 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
        <button
          onClick={handleFuse}
          disabled={!isReady || isFusing}
+         aria-live="polite"
+         aria-label={
+           !isReady ? "Awaiting data to initiate fusion" :
+           isFusing ? `Fusion in progress: ${LOADING_MESSAGES[loadingMsgIdx]}` :
+           "Initiate Fusion between graphics and logic repositories"
+         }
          className={cn(
            "relative z-10 w-72 h-72 rounded-full border-[6px] flex items-center justify-center flex-col gap-4 transition-all duration-700 backdrop-blur-xl shadow-2xl",
            !isReady ? "border-white/10 bg-black/60 text-white/30 cursor-not-allowed" :
