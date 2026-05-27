@@ -53,16 +53,27 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
 
       {/* Input Area */}
       <div className="flex flex-col gap-3">
-        <label className="text-xs font-mono text-muted-foreground uppercase tracking-wider pl-1">GitHub Repository Target</label>
+        <label
+          htmlFor={`repo-url-${role}`}
+          className="text-xs font-mono text-muted-foreground uppercase tracking-wider pl-1"
+        >
+          GitHub Repository Target
+        </label>
         <div className="flex flex-col sm:flex-row gap-3">
           <CyberInput
+            id={`repo-url-${role}`}
             accent={accent}
             value={state.url}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => onStateChange({ ...state, url: e.target.value })}
             placeholder="https://github.com/username/game-repo"
             className="flex-1"
           />
-          <CyberButton accent={accent} onClick={handleFetch} disabled={isFetching || !state.url}>
+          <CyberButton
+            accent={accent}
+            onClick={handleFetch}
+            disabled={isFetching || !state.url}
+            aria-label={isFetching ? "Connecting to repository..." : "Initiate repository link"}
+          >
             {isFetching ? <Loader2 className="animate-spin h-5 w-5" /> : "Initiate Link"}
           </CyberButton>
         </div>
@@ -92,7 +103,13 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
             ))}
           />
 
-          <CyberButton accent={accent} className="w-full mt-4 text-lg py-4" onClick={handleAnalyze} disabled={isAnalyzing}>
+          <CyberButton
+            accent={accent}
+            className="w-full mt-4 text-lg py-4"
+            onClick={handleAnalyze}
+            disabled={isAnalyzing}
+            aria-label={isAnalyzing ? "Analyzing repository structure..." : "Initialize AI repository analysis"}
+          >
             {isAnalyzing ? (
               <span className="flex items-center gap-3 justify-center"><Loader2 className="animate-spin"/> Executing Deep Scan...</span>
             ) : (

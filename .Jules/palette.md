@@ -1,0 +1,3 @@
+## 2025-05-15 - [Accessibility & Clarity Polish]
+**Learning:** In a complex, theme-heavy interface (like "Cyber" or "Futuristic" styles), semantic elements and explicit ARIA labels are often overlooked in favor of aesthetics. Explicitly associating labels with inputs and providing aria-labels for icon-only or loading states is critical for maintaining accessibility without compromising the visual style.
+**Action:** Always ensure unique IDs are generated for form fields in reusable components (e.g., using a `role` or `id` prop) and provide descriptive `aria-label` content for buttons that transition between icon and text states.
