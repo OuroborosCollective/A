@@ -120,10 +120,18 @@ function Gallery() {
 function getPreviewPath(): string | null {
   const basePath = getBasePath();
   const { pathname } = window.location;
-  const local =
-    basePath && pathname.startsWith(basePath)
-      ? pathname.slice(basePath.length) || "/"
-      : pathname;
+
+  // Robustly handle the local path extraction regardless of trailing slashes or base path presence
+  let local = pathname;
+  if (basePath && pathname.startsWith(basePath)) {
+    local = pathname.slice(basePath.length);
+  }
+
+  // Ensure local path starts with / for consistent matching
+  if (!local.startsWith("/")) {
+    local = "/" + local;
+  }
+
   const match = local.match(/^\/preview\/(.+)$/);
   return match ? match[1] : null;
 }

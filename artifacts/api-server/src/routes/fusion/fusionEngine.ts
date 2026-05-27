@@ -64,23 +64,21 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
     ...gameB.analysis.warnings.map(w => `Game B: ${w}`),
   ];
 
-  // Check rendering engine compatibility
   if (archA.renderingEngine && archB.renderingEngine && archA.renderingEngine !== archB.renderingEngine) {
     warnings.push(
       `Rendering engine mismatch: Game A uses ${archA.renderingEngine}, Game B uses ${archB.renderingEngine}. ` +
-      `The fusion will adapt Game B's logic to work with Game A's rendering system.`
+      `The fusion will adapt Game B's logical data structures to work with Game A's graphical overlay.`
     );
   }
 
-  // Build context for AI
   const visualContext = archA.visualFiles
     .slice(0, 12)
-    .map(f => `// FILE: ${f.path} (${f.reason})\n${truncateContent(f.content)}`)
+    .map(f => `// FILE: ${f.path} (GRAPHICAL ROLE: ${f.reason})\n${truncateContent(f.content)}`)
     .join("\n\n---\n\n");
 
   const logicContext = archB.logicFiles
     .slice(0, 12)
-    .map(f => `// FILE: ${f.path} (${f.reason})\n${truncateContent(f.content)}`)
+    .map(f => `// FILE: ${f.path} (LOGICAL ROLE: ${f.reason})\n${truncateContent(f.content)}`)
     .join("\n\n---\n\n");
 
   const assetList = archA.assetFiles
@@ -88,67 +86,55 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
     .map(f => f.path)
     .join("\n");
 
-  const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
+  const systemPrompt = `You are an expert game architect who specializes in deep code synthesis.
 
-Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphics, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (player mechanics, physics, collision, AI, scoring, game loop) from Game B
-3. Combining them into a single working HTML5 web game
+Your mission is to create a NEW hybrid game by performing a "BRAIN TRANSPLANT":
+1. Take the GRAPHICAL OVERLAY (The Skin) from Game A:
+   - This includes all rendering code, scene setup, world construction, and visual UI.
+   - Use Game A's sprites, animations, and camera logic.
+2. Take the LOGICAL DATA STRUCTURE (The Brain) from Game B:
+   - This includes player state, physics calculations, AI decision trees, and game rules.
+   - Use Game B's movement logic and collision handling, but map them to Game A's world.
 
-The output MUST be:
-- A self-contained HTML5 game that runs in a browser (index.html + any supporting JS/CSS files)
-- Fully functional with the visual world of Game A and the gameplay mechanics of Game B
-- Written in clean, modern JavaScript
-- No external dependencies that aren't available via CDN (if needed, use CDN links)
+Synthesis Instructions:
+- Create a unified HTML5/JS game environment.
+- Map Game B's abstract "Player" or "Entity" logic to Game A's specific visual sprites.
+- Ensure the core game loop uses Game B's rules but Game A's rendering timing.
+- Bridge the data structures: If Game B expects a 2D array for collision, and Game A provides a tilemap, you must write the adapter code.
+- No external dependencies except via CDN.
 
-You MUST adapt and bridge the code:
-- Wire Game A's visual elements to Game B's game loop
-- Replace Game B's rendering calls with Game A's graphics/assets/visual style
-- Ensure asset paths reference the actual assets from Game A (use relative paths)
-- Handle the case where the rendering engines differ by adapting the approach
-
-Return ONLY valid JSON with this structure:
+Return ONLY valid JSON:
 {
   "files": [
     {
       "path": "index.html",
       "content": "full file content as string",
-      "description": "brief description"
+      "description": "How the skin of A was merged with the brain of B"
     }
   ],
-  "summary": "description of what was merged and how",
+  "summary": "Deep architectural summary of the fusion",
   "compatibilityScore": 0-100,
-  "warnings": ["any issues or limitations"]
-}
+  "warnings": ["List specific technical hurdles encountered during the synthesis"]
+}`;
 
-Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html must be the entry point.`;
-
-  const userPrompt = `GAME A (provides visuals): ${gameA.repoData.owner}/${gameA.repoData.repo}
-Rendering Engine: ${archA.renderingEngine || "unknown"}
-Game Genre: ${archA.gameGenre || "unknown"}  
+  const userPrompt = `GAME A (PROVIDES GRAPHICAL OVERLAY): ${gameA.repoData.owner}/${gameA.repoData.repo}
+Rendering: ${archA.renderingEngine || "unknown"}
 Summary: ${archA.summary}
 
-Visual Code Files from Game A:
+Visual/Graphical Files from Game A:
 ${visualContext || "No visual files identified"}
-
-Asset Files from Game A (reference these paths in your output):
-${assetList || "No assets identified"}
 
 ---
 
-GAME B (provides logic): ${gameB.repoData.owner}/${gameB.repoData.repo}
-Rendering Engine: ${archB.renderingEngine || "unknown"}
-Game Genre: ${archB.gameGenre || "unknown"}
+GAME B (PROVIDES LOGICAL DATA STRUCTURE): ${gameB.repoData.owner}/${gameB.repoData.repo}
 Summary: ${archB.summary}
 
-Logic Code Files from Game B:
+Logic/Mechanics Files from Game B:
 ${logicContext || "No logic files identified"}
 
 ---
 
-Create the hybrid game. Use Game A's visual world and rendering style with Game B's game mechanics.
-If assets from Game A are referenced, use relative paths (they will be in the same ZIP).
-If the games are very different, create the best possible fusion explaining the tradeoffs.`;
+Generate the complete hybrid source. Prioritize mapping Game B's rules into Game A's visual world.`;
 
   const response = await openai.chat.completions.create({
     model: "gpt-5.3-codex",
@@ -182,18 +168,13 @@ If the games are very different, create the best possible fusion explaining the 
     throw new Error("AI failed to generate any game files. Please try again.");
   }
 
-  // Ensure index.html exists
-  if (!files.some(f => f.path === "index.html" || f.path === "./index.html")) {
-    allWarnings.push("No index.html was generated. You may need to manually create an entry point.");
-  }
-
   return {
     files: files.map(f => ({
       path: f.path,
       content: f.content,
       description: f.description || f.path,
     })),
-    summary: parsed.summary || `Fused ${gameA.repoData.repo} visuals with ${gameB.repoData.repo} logic`,
+    summary: parsed.summary || `Fused ${gameA.repoData.repo} graphics with ${gameB.repoData.repo} logic`,
     warnings: allWarnings,
     compatibilityScore: Math.min(100, Math.max(0, parsed.compatibilityScore ?? 50)),
   };

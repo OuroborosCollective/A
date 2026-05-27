@@ -48,25 +48,37 @@ export async function analyzeGameRepo(
   const assetList = assetFiles.map(f => f.path).join("\n");
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and classify files into categories:
-- visual: rendering code, canvas drawing, scene setup, level/world design, tilemap, sprites rendering
-- logic: player controller, physics, collision detection, enemy AI, game state machine, scoring, input handling
-- asset: images, audio, fonts, 3D models, sprite sheets
-- config: package.json, config files, build scripts
-- other: tests, documentation, utilities
+Your task is to analyze the source code and classify files into clear architectural layers.
 
-You must also detect:
-- The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
-- The game genre (e.g., "platformer", "shooter", "puzzle", "rpg", "racing", "strategy")
-- A brief summary of what the game does
+Crucially, you must distinguish between:
+1. THE GRAPHICAL OVERLAY & VISUAL LAYER:
+   - Rendering code (Canvas, WebGL, Three.js)
+   - Asset loading and sprite mapping
+   - World/Scene construction (tilemaps, background rendering)
+   - Visual effects (particles, shaders)
+   - UI/HUD components
 
-Return ONLY valid JSON matching this exact structure:
+2. THE LOGICAL DATA STRUCTURE & GAME MECHANICS:
+   - Game state management (score, health, inventory)
+   - Player controllers and movement algorithms
+   - Physics engines and collision logic
+   - AI behavior and NPC logic
+   - Core game loop and event handling
+
+Classification categories:
+- visual: Everything related to rendering and the visual presentation (The "Skin")
+- logic: Everything related to data structures, mechanics, and rules (The "Brain")
+- asset: Raw media files (Images, Audio)
+- config: Project meta-data (package.json, tsconfig)
+- other: Documentation, tests, generic utilities
+
+Return ONLY valid JSON:
 {
   "renderingEngine": "string or null",
   "gameGenre": "string or null", 
   "summary": "string",
   "categorizedFiles": [
-    { "path": "string", "category": "visual|logic|asset|config|other", "reason": "brief reason" }
+    { "path": "string", "category": "visual|logic|asset|config|other", "reason": "detailed reason explaining the role in the architecture" }
   ],
   "warnings": ["string"]
 }`;
@@ -74,7 +86,7 @@ Return ONLY valid JSON matching this exact structure:
   const userPrompt = `Repository: ${repoData.owner}/${repoData.repo}
 Description: ${repoData.description || "None"}
 Total files: ${repoData.totalFiles}
-This repo will contribute: ${role === "graphics" ? "VISUAL LAYER (graphics, world, levels)" : "LOGIC LAYER (game mechanics, physics, AI)"}
+This repo will contribute: ${role === "graphics" ? "VISUAL LAYER / GRAPHICAL OVERLAY" : "LOGIC LAYER / DATA STRUCTURE"}
 
 Asset files (not included in content):
 ${assetList || "None"}
@@ -111,7 +123,6 @@ ${fileSummary || "No code files found"}`;
   const warnings: string[] = parsed.warnings || [];
   const categorizedFiles = parsed.categorizedFiles || [];
 
-  // Build file maps enriched with content
   const contentMap = new Map(repoData.files.map(f => [f.path, f.content]));
 
   const visualFiles: FileCategory[] = [];
@@ -131,7 +142,6 @@ ${fileSummary || "No code files found"}`;
     else if (f.category === "asset") assetCats.push(entry);
   }
 
-  // Add any remaining asset files not already categorized
   for (const af of assetFiles) {
     if (!categorizedFiles.some(c => c.path === af.path)) {
       assetCats.push({ path: af.path, category: "asset", reason: "Binary asset file", content: null });
