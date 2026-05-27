@@ -8,8 +8,8 @@ interface FileCategory {
 }
 
 interface GameArchitecture {
-  renderingEngine: string | null;
-  gameGenre: string | null;
+  renderingEngine?: string | null;
+  gameGenre?: string | null;
   summary: string;
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
