@@ -40,6 +40,23 @@ export async function analyzeGameRepo(
   repoData: RepoData,
   role: "graphics" | "logic"
 ): Promise<{ architecture: GameArchitecture; warnings: string[] }> {
+  // Check Learning Matrix for existing knowledge
+  const repoId = `${repoData.owner}/${repoData.repo}`;
+  try {
+    const existing = await db.query.learningMatrix.findFirst({
+      where: eq(learningMatrix.repoIdentifier, repoId),
+    });
+
+    if (existing) {
+      const cached = existing.analysisResult as { architecture: GameArchitecture; warnings: string[] };
+      // Note: We might want to re-run if role changed or content is outdated,
+      // but for "speeding up next time" we return cached if available.
+      return cached;
+    }
+  } catch (err) {
+    console.error("Learning matrix lookup failed:", err);
+  }
+
   const codeFiles = repoData.files.filter(f => f.content);
   const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
 
@@ -176,7 +193,7 @@ ${fileSummary || "No code files found"}`;
     warnings.push("Could not identify clear game code structure. This may not be a web game repository.");
   }
 
-  return {
+  const result = {
     architecture: {
       renderingEngine: parsed.renderingEngine ?? null,
       gameGenre: parsed.gameGenre ?? null,
@@ -188,4 +205,28 @@ ${fileSummary || "No code files found"}`;
     },
     warnings,
   };
+
+  // Save knowledge to Learning Matrix
+  try {
+    await db.insert(learningMatrix).values({
+      repoIdentifier: repoId,
+      renderingEngine: result.architecture.renderingEngine,
+      gameGenre: result.architecture.gameGenre,
+      analysisResult: result,
+      // Detecting structure type could be more sophisticated
+      structureType: repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" : "flat",
+    }).onConflictDoUpdate({
+      target: learningMatrix.repoIdentifier,
+      set: {
+        analysisResult: result,
+        renderingEngine: result.architecture.renderingEngine,
+        gameGenre: result.architecture.gameGenre,
+        updatedAt: new Date(),
+      }
+    });
+  } catch (err) {
+    console.error("Failed to save to learning matrix:", err);
+  }
+
+  return result;
 }

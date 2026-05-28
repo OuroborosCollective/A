@@ -100,6 +100,11 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
             <CheckCircle2 size={48} className="text-primary" />
           </motion.div>
           <h2 className="text-4xl md:text-5xl font-display font-bold uppercase tracking-widest text-white mb-4">Fusion Complete</h2>
+          <div className="flex items-center gap-4 mb-6 text-xs font-mono tracking-widest uppercase">
+            <span className="text-cyan-400">Graphical Overlay: {gameA.data?.repo}</span>
+            <span className="text-white/20">|</span>
+            <span className="text-fuchsia-400">Logical Structure: {gameB.data?.repo}</span>
+          </div>
           <p className="text-muted-foreground font-mono max-w-3xl mb-10 leading-relaxed text-sm md:text-base">{fusionResult.summary}</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mb-10 text-left">
