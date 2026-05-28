@@ -1,0 +1,12 @@
+
+> @workspace/game-fusion@0.0.0 dev /app/artifacts/game-fusion
+> vite --config vite.config.ts --host 0.0.0.0
+
+
+  VITE v7.3.1  ready in 397 ms
+
+  ➜  Local:   http://localhost:3000/
+  ➜  Network: http://192.168.0.2:3000/
+/app/artifacts/game-fusion:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @workspace/game-fusion@0.0.0 dev: `vite --config vite.config.ts --host 0.0.0.0`
+Command failed with signal "SIGTERM"

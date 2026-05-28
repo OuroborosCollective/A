@@ -91,8 +91,8 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphics, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (player mechanics, physics, collision, AI, scoring, game loop) from Game B
+1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A
+2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B
 3. Combining them into a single working HTML5 web game
 
 The output MUST be:

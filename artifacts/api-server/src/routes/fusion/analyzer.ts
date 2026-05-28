@@ -1,4 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { db, learningMatrix } from "@workspace/db";
+import { eq } from "drizzle-orm";
 
 interface RepoFile {
   path: string;
@@ -37,6 +39,23 @@ export async function analyzeGameRepo(
   repoData: RepoData,
   role: "graphics" | "logic"
 ): Promise<{ architecture: GameArchitecture; warnings: string[] }> {
+  // Check Learning Matrix for existing knowledge
+  const repoId = `${repoData.owner}/${repoData.repo}`;
+  try {
+    const existing = await db.query.learningMatrix.findFirst({
+      where: eq(learningMatrix.repoIdentifier, repoId),
+    });
+
+    if (existing) {
+      const cached = existing.analysisResult as { architecture: GameArchitecture; warnings: string[] };
+      // Note: We might want to re-run if role changed or content is outdated,
+      // but for "speeding up next time" we return cached if available.
+      return cached;
+    }
+  } catch (err) {
+    console.error("Learning matrix lookup failed:", err);
+  }
+
   const codeFiles = repoData.files.filter(f => f.content);
   const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
 
@@ -48,9 +67,9 @@ export async function analyzeGameRepo(
   const assetList = assetFiles.map(f => f.path).join("\n");
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and classify files into categories:
-- visual: rendering code, canvas drawing, scene setup, level/world design, tilemap, sprites rendering
-- logic: player controller, physics, collision detection, enemy AI, game state machine, scoring, input handling
+Your task is to analyze the source code and classify files into categories, explicitly distinguishing between graphical overlays and logical data structures:
+- visual: rendering code, canvas drawing, scene setup, level/world design, tilemap, sprites rendering, UI overlays, graphical shaders
+- logic: player controller, physics, collision detection, enemy AI, game state machine, scoring, input handling, data structures, routing, API connections
 - asset: images, audio, fonts, 3D models, sprite sheets
 - config: package.json, config files, build scripts
 - other: tests, documentation, utilities
@@ -142,7 +161,7 @@ ${fileSummary || "No code files found"}`;
     warnings.push("Could not identify clear game code structure. This may not be a web game repository.");
   }
 
-  return {
+  const result = {
     architecture: {
       renderingEngine: parsed.renderingEngine ?? null,
       gameGenre: parsed.gameGenre ?? null,
@@ -153,4 +172,28 @@ ${fileSummary || "No code files found"}`;
     },
     warnings,
   };
+
+  // Save knowledge to Learning Matrix
+  try {
+    await db.insert(learningMatrix).values({
+      repoIdentifier: repoId,
+      renderingEngine: result.architecture.renderingEngine,
+      gameGenre: result.architecture.gameGenre,
+      analysisResult: result,
+      // Detecting structure type could be more sophisticated
+      structureType: repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" : "flat",
+    }).onConflictDoUpdate({
+      target: learningMatrix.repoIdentifier,
+      set: {
+        analysisResult: result,
+        renderingEngine: result.architecture.renderingEngine,
+        gameGenre: result.architecture.gameGenre,
+        updatedAt: new Date(),
+      }
+    });
+  } catch (err) {
+    console.error("Failed to save to learning matrix:", err);
+  }
+
+  return result;
 }

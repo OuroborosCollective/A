@@ -145,9 +145,24 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
           </div>
 
           <div className="grid grid-cols-3 gap-3">
-             <StatCard title="Visual Payload" count={state.analysis.architecture.visualFiles.length} accent={accent} />
-             <StatCard title="Logic Nodes" count={state.analysis.architecture.logicFiles.length} accent={accent} />
-             <StatCard title="Asset Pack" count={state.analysis.architecture.assetFiles.length} accent={accent} />
+             <StatCard
+               title="Graphical Overlay"
+               count={state.analysis.architecture.visualFiles.length}
+               accent={accent}
+               description="Visual/Rendering Files"
+             />
+             <StatCard
+               title="Logical Structure"
+               count={state.analysis.architecture.logicFiles.length}
+               accent={accent}
+               description="Mechanics/Data Files"
+             />
+             <StatCard
+               title="Asset Pack"
+               count={state.analysis.architecture.assetFiles.length}
+               accent={accent}
+               description="Binary/Static Assets"
+             />
           </div>
 
           {state.analysis.warnings.length > 0 && (
@@ -168,12 +183,17 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
   );
 }
 
-function StatCard({ title, count, accent }: { title: string, count: number, accent: string }) {
+function StatCard({ title, count, accent, description }: { title: string, count: number, accent: string, description?: string }) {
   const isCyan = accent === 'cyan';
   return (
-    <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
+    <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner hover:bg-black/40 transition-colors cursor-help group relative ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
       <span className={`text-3xl font-display font-bold mb-1 ${isCyan ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]' : 'text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]'}`}>{count}</span>
       <span className="text-[10px] sm:text-xs font-mono uppercase text-muted-foreground">{title}</span>
+      {description && (
+        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/90 border border-white/10 p-2 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
+          {description}
+        </div>
+      )}
     </div>
   );
 }
