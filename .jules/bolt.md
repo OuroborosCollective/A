@@ -24,6 +24,16 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 ## 2026-05-28 - Optimized asset categorization with Set lookup
 **Learning:** Checking for item existence in an array within a loop using `.some()` or `.includes()` leads to O(N*M) time complexity. For file path lookups or list deduplication, using a `Set` reduces this to O(N+M).
 **Action:** Replaced `Array.prototype.some()` with a `Set.prototype.has()` check in the Game Fusion analyzer's asset categorization loop.
+
+## 2025-05-29 - Optimized architectural context retrieval with composite index
+
+**Learning:** When queries involve both filtering on one column and ordering by another (e.g., `WHERE category = ? ORDER BY confidence DESC`), a single-column index on the filter column is insufficient for optimal performance as it still requires a sort operation. A composite index on `(filter_column, sort_column)` allows the database to retrieve results in the correct order directly from the index.
+
+**Action:** Added a composite index on the `knowledge` table for the `category` and `confidence` columns.
+
+**Predicted Performance Impact:**
+- **Before:** The database would likely use an index scan on `category` (if indexed) followed by a `Top-N Sort` or `External Merge Sort` to order by `confidence`.
+- **After:** The database can perform an `Index Scan` on the composite index, which provides the rows in the pre-sorted order of `confidence` for each `category`, effectively making the sort operation O(1) for the query.
 ## 2025-05-15 - Optimized asset categorization loop in fusion analyzer
 
 **Learning:** When dealing with large lists of files (like in a repository scan), nested loops using `Array.prototype.some` or `Array.prototype.includes` can quickly become a performance bottleneck with O(N*M) complexity. Using a `Set` for lookups reduces this to O(N+M).
