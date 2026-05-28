@@ -9,6 +9,7 @@ import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, isCod
 import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
+import path from "path";
 
 const router: IRouter = Router();
 
@@ -140,7 +141,13 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
   archive.pipe(res);
 
   for (const file of fusionResult.files) {
-    archive.append(file.content, { name: file.path });
+    // Sanitize the file path to prevent directory traversal within the ZIP
+    // We want to ensure paths are relative and don't escape the archive root
+    const sanitizedPath = path
+      .normalize(file.path)
+      .replace(/^(\.\.(\/|\\|$))+/, "")
+      .replace(/^[\\\/]+/, "");
+    archive.append(file.content, { name: sanitizedPath });
   }
 
   // Add a README with fusion summary
