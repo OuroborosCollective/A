@@ -4,10 +4,13 @@ import helmet from "helmet";
 import pinoHttp from "pino-http";
 import router from "./routes";
 import { logger } from "./lib/logger";
+import { apiRateLimiter } from "./middlewares/rateLimiter";
 
 const app: Express = express();
 
 app.use(helmet());
+app.set("trust proxy", 1); // Trust the first proxy (e.g. Replit or a Load Balancer) for rate limiting
+app.use("/api", apiRateLimiter);
 app.use(
   pinoHttp({
     logger,
