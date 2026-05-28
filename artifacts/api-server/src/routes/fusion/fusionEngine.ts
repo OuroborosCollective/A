@@ -1,4 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { db, knowledge } from "@workspace/db";
 
 interface FileCategory {
   path: string;
@@ -14,6 +15,7 @@ interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  interfacePatterns?: string[];
 }
 
 interface AnalysisResult {
@@ -187,7 +189,7 @@ If the games are very different, create the best possible fusion explaining the 
     allWarnings.push("No index.html was generated. You may need to manually create an entry point.");
   }
 
-  return {
+  const fusionResult: FusionResult = {
     files: files.map(f => ({
       path: f.path,
       content: f.content,
@@ -197,4 +199,35 @@ If the games are very different, create the best possible fusion explaining the 
     warnings: allWarnings,
     compatibilityScore: Math.min(100, Math.max(0, parsed.compatibilityScore ?? 50)),
   };
+
+  // Record successful fusion knowledge
+  if (fusionResult.compatibilityScore > 70) {
+    try {
+      await db.insert(knowledge).values({
+        category: "fusion_strategy",
+        subCategory: archA.gameGenre || "unknown",
+        key: `${gameA.repoData.owner}/${gameA.repoData.repo}_x_${gameB.repoData.owner}/${gameB.repoData.repo}`,
+        content: {
+          archA: {
+            renderingEngine: archA.renderingEngine,
+            gameGenre: archA.gameGenre,
+            interfacePatterns: archA.interfacePatterns,
+          },
+          archB: {
+            renderingEngine: archB.renderingEngine,
+            gameGenre: archB.gameGenre,
+            interfacePatterns: archB.interfacePatterns,
+          },
+          summary: fusionResult.summary,
+          compatibilityScore: fusionResult.compatibilityScore,
+        },
+        tags: [archA.renderingEngine || "unknown", archB.renderingEngine || "unknown", archA.gameGenre || "unknown"],
+        confidence: fusionResult.compatibilityScore,
+      });
+    } catch (err) {
+      console.error("Failed to save fusion knowledge:", err);
+    }
+  }
+
+  return fusionResult;
 }
