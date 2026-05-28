@@ -121,12 +121,18 @@ function getPreviewPath(): string | null {
   const basePath = getBasePath();
   const { pathname } = window.location;
 
-  let local = pathname;
+  // Normalize path by removing trailing slash (unless it's the root)
+  const normalizedPath = pathname.length > 1 && pathname.endsWith("/")
+    ? pathname.slice(0, -1)
+    : pathname;
+
+  let local = normalizedPath;
   if (basePath) {
-    if (pathname === basePath) {
+    const normalizedBasePath = basePath.replace(/\/$/, "");
+    if (normalizedPath === normalizedBasePath || normalizedPath === normalizedBasePath + "/") {
       local = "/";
-    } else if (pathname.startsWith(basePath + "/")) {
-      local = pathname.slice(basePath.length);
+    } else if (normalizedPath.startsWith(normalizedBasePath + "/")) {
+      local = normalizedPath.slice(normalizedBasePath.length);
     }
   }
 

@@ -1,5 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { db, knowledge } from "@workspace/db";
+import { db, knowledge, learningMatrix } from "@workspace/db";
 import { desc, eq, or } from "drizzle-orm";
 
 interface RepoFile {
@@ -34,6 +34,8 @@ interface GameArchitecture {
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
   interfacePatterns?: string[];
+  logicalRoutesDetected?: string[];
+  dataStructuresDetected?: string[];
 }
 
 export async function analyzeGameRepo(
@@ -91,19 +93,24 @@ export async function analyzeGameRepo(
   }
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and strictly classify files into layers:
-- visual (Visual Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+Your task is to analyze the source code and strictly classify files into layers, maintaining a sharp distinction between the **Graphical Overlay** and the **Logical Core**.
+
+Classification Categories:
+- visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, animations, and camera management.
+- logic (Logical Core): Game mechanics, state management, physics, collision math, logical routes (navigation/pathfinding), core data structures (entities, inventories, stats), enemy behavior (AI), input processing, and scoring.
 - asset: Images, audio, fonts, 3D models, sprite sheets.
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Interfaces" - where the logic layer tells the visual layer what to draw (e.g., event emitters, state subscriptions, or direct function calls like drawPlayer(x, y)).
+Crucially, identify:
+1. "Interfaces": Where the logic layer tells the visual layer what to draw (e.g., event emitters, state subscriptions, or direct function calls like drawPlayer(x, y)).
+2. "Logical Routes": The internal paths or decision trees used by the game's logic.
+3. "Data Structures": The underlying organization of game data that is independent of how it is visually represented.
 
 You must also detect:
 - The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
 - The game genre (e.g., "platformer", "shooter", "puzzle", "rpg", "racing", "strategy")
-- A brief summary of the game architecture and how the visual and logic layers communicate.
+- A brief summary of the game architecture and how the graphical overlay and logical core layers communicate.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -114,6 +121,8 @@ Return ONLY valid JSON matching this exact structure:
     { "path": "string", "category": "visual|logic|asset|config|other", "reason": "brief reason" }
   ],
   "interfacePatterns": ["list of strings describing how layers interact"],
+  "logicalRoutesDetected": ["list of logical paths or decision trees found"],
+  "dataStructuresDetected": ["list of core data structures identified"],
   "warnings": ["string"]
 }
 
@@ -148,6 +157,8 @@ ${fileSummary || "No code files found"}`;
     summary?: string;
     categorizedFiles?: Array<{ path: string; category: string; reason: string }>;
     interfacePatterns?: string[];
+    logicalRoutesDetected?: string[];
+    dataStructuresDetected?: string[];
     warnings?: string[];
   };
 
@@ -202,22 +213,41 @@ ${fileSummary || "No code files found"}`;
       logicFiles,
       assetFiles: assetCats,
       interfacePatterns: parsed.interfacePatterns ?? [],
+      logicalRoutesDetected: parsed.logicalRoutesDetected ?? [],
+      dataStructuresDetected: parsed.dataStructuresDetected ?? [],
     },
     warnings,
   };
+
+  // Enhanced Metadata Detection for Learning Matrix
+  const languages = new Set<string>();
+  repoData.files.forEach(f => {
+    const ext = f.path.split(".").pop()?.toLowerCase();
+    if (ext === "ts" || ext === "tsx") languages.add("TypeScript");
+    else if (ext === "js" || ext === "jsx") languages.add("JavaScript");
+    else if (ext === "py") languages.add("Python");
+    else if (ext === "lua") languages.add("Lua");
+    else if (ext === "cpp" || ext === "h") languages.add("C++");
+  });
+  const primaryLanguage = Array.from(languages)[0] || "Unknown";
+
+  const isMonorepo = repoData.files.some(f => f.path.includes("package.json") && f.path.split("/").length > 1);
+  const structureType = isMonorepo ? "monorepo" : (repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" : "flat");
 
   // Save knowledge to Learning Matrix
   try {
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
+      language: primaryLanguage,
+      structureType,
       renderingEngine: result.architecture.renderingEngine,
       gameGenre: result.architecture.gameGenre,
       analysisResult: result,
-      // Detecting structure type could be more sophisticated
-      structureType: repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" : "flat",
     }).onConflictDoUpdate({
       target: learningMatrix.repoIdentifier,
       set: {
+        language: primaryLanguage,
+        structureType,
         analysisResult: result,
         renderingEngine: result.architecture.renderingEngine,
         gameGenre: result.architecture.gameGenre,
