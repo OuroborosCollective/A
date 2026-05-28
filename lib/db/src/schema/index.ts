@@ -19,4 +19,4 @@
 
 export * from "./conversations";
 export * from "./messages";
-export * from "./learning-matrix";
+export * from "./knowledge";

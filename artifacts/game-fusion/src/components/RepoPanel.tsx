@@ -5,6 +5,7 @@ import { RepoState } from "@/pages/Home";
 import { Loader2, GitBranch, FolderGit2, Cpu, Image as ImageIcon } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RepoPanelProps {
   title: string;
@@ -146,7 +147,7 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
 
           <div className="grid grid-cols-3 gap-3">
              <StatCard
-               title="Graphical Overlay"
+a               title="Graphical Overlay"
                count={state.analysis.architecture.visualFiles.length}
                accent={accent}
                description="Visual/Rendering Files"
@@ -156,12 +157,22 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
                count={state.analysis.architecture.logicFiles.length}
                accent={accent}
                description="Mechanics/Data Files"
+               title="Visual Payload"
+               count={state.analysis.architecture.visualFiles.length}
+               accent={accent}
+               description="Count of shaders, textures, and models"
+             />
+             <StatCard
+               title="Logic Nodes"
+               count={state.analysis.architecture.logicFiles.length}
+               accent={accent}
+               description="Count of scripts and core logic files"
              />
              <StatCard
                title="Asset Pack"
                count={state.analysis.architecture.assetFiles.length}
                accent={accent}
-               description="Binary/Static Assets"
+q               description="Count of audio files and static resources"
              />
           </div>
 
@@ -185,8 +196,8 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
 
 function StatCard({ title, count, accent, description }: { title: string, count: number, accent: string, description?: string }) {
   const isCyan = accent === 'cyan';
-  return (
-    <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner hover:bg-black/40 transition-colors cursor-help group relative ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
+  const content = (
+    <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner h-full w-full ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
       <span className={`text-3xl font-display font-bold mb-1 ${isCyan ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]' : 'text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]'}`}>{count}</span>
       <span className="text-[10px] sm:text-xs font-mono uppercase text-muted-foreground">{title}</span>
       {description && (
@@ -195,5 +206,20 @@ function StatCard({ title, count, accent, description }: { title: string, count:
         </div>
       )}
     </div>
+  );
+
+  if (!description) return content;
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <div className="cursor-help h-full w-full">
+          {content}
+        </div>
+      </TooltipTrigger>
+      <TooltipContent>
+        <p className="text-xs font-mono">{description}</p>
+      </TooltipContent>
+    </Tooltip>
   );
 }

@@ -1,6 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { db, learningMatrix } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { db, knowledge } from "@workspace/db";
+import { desc, eq, or } from "drizzle-orm";
 
 interface RepoFile {
   path: string;
@@ -33,6 +33,7 @@ interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  interfacePatterns?: string[];
 }
 
 export async function analyzeGameRepo(
@@ -66,18 +67,43 @@ export async function analyzeGameRepo(
 
   const assetList = assetFiles.map(f => f.path).join("\n");
 
+  // Fetch relevant knowledge context
+  let knowledgeContext = "";
+  try {
+    const similarKnowledge = await db
+      .select()
+      .from(knowledge)
+      .where(
+        or(
+          eq(knowledge.category, "architecture"),
+          eq(knowledge.category, "fusion_strategy")
+        )
+      )
+      .orderBy(desc(knowledge.confidence))
+      .limit(5);
+
+    if (similarKnowledge.length > 0) {
+      knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
+        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+    }
+  } catch (err) {
+    console.error("Failed to fetch knowledge context:", err);
+  }
+
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and classify files into categories, explicitly distinguishing between graphical overlays and logical data structures:
-- visual: rendering code, canvas drawing, scene setup, level/world design, tilemap, sprites rendering, UI overlays, graphical shaders
-- logic: player controller, physics, collision detection, enemy AI, game state machine, scoring, input handling, data structures, routing, API connections
-- asset: images, audio, fonts, 3D models, sprite sheets
-- config: package.json, config files, build scripts
-- other: tests, documentation, utilities
+Your task is to analyze the source code and strictly classify files into layers:
+- visual (Visual Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
+- logic (Logical Core): Game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- asset: Images, audio, fonts, 3D models, sprite sheets.
+- config: package.json, config files, build scripts.
+- other: tests, documentation, utilities.
+
+Crucially, identify the "Interfaces" - where the logic layer tells the visual layer what to draw (e.g., event emitters, state subscriptions, or direct function calls like drawPlayer(x, y)).
 
 You must also detect:
 - The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
 - The game genre (e.g., "platformer", "shooter", "puzzle", "rpg", "racing", "strategy")
-- A brief summary of what the game does
+- A brief summary of the game architecture and how the visual and logic layers communicate.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -87,8 +113,11 @@ Return ONLY valid JSON matching this exact structure:
   "categorizedFiles": [
     { "path": "string", "category": "visual|logic|asset|config|other", "reason": "brief reason" }
   ],
+  "interfacePatterns": ["list of strings describing how layers interact"],
   "warnings": ["string"]
-}`;
+}
+
+${knowledgeContext}`;
 
   const userPrompt = `Repository: ${repoData.owner}/${repoData.repo}
 Description: ${repoData.description || "None"}
@@ -118,6 +147,7 @@ ${fileSummary || "No code files found"}`;
     gameGenre?: string | null;
     summary?: string;
     categorizedFiles?: Array<{ path: string; category: string; reason: string }>;
+    interfacePatterns?: string[];
     warnings?: string[];
   };
 
@@ -151,8 +181,10 @@ ${fileSummary || "No code files found"}`;
   }
 
   // Add any remaining asset files not already categorized
+  // Optimization: Use a Set for O(1) path lookups to improve performance from O(N*M) to O(N+M)
+  const categorizedPaths = new Set(categorizedFiles.map(c => c.path));
   for (const af of assetFiles) {
-    if (!categorizedFiles.some(c => c.path === af.path)) {
+    if (!categorizedPaths.has(af.path)) {
       assetCats.push({ path: af.path, category: "asset", reason: "Binary asset file", content: null });
     }
   }
@@ -169,6 +201,7 @@ ${fileSummary || "No code files found"}`;
       visualFiles,
       logicFiles,
       assetFiles: assetCats,
+      interfacePatterns: parsed.interfacePatterns ?? [],
     },
     warnings,
   };

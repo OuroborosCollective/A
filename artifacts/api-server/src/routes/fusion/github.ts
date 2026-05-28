@@ -19,6 +19,7 @@ const ASSET_EXTENSIONS = new Set([
 export function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
     const u = new URL(url.trim());
+    if (u.protocol !== "https:") return null;
     if (u.hostname !== "github.com") return null;
     const parts = u.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
     if (parts.length < 2) return null;
