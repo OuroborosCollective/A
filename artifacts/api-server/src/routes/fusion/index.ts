@@ -10,6 +10,7 @@ import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
 import path from "path";
+import { expensiveOperationRateLimiter } from "../../middlewares/rateLimiter";
 
 const router: IRouter = Router();
 
@@ -78,7 +79,7 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/fusion/analyze", async (req, res): Promise<void> => {
+router.post("/fusion/analyze", expensiveOperationRateLimiter, async (req, res): Promise<void> => {
   const parsed = AnalyzeRepoBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -98,7 +99,7 @@ router.post("/fusion/analyze", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/fusion/fuse", async (req, res): Promise<void> => {
+router.post("/fusion/fuse", expensiveOperationRateLimiter, async (req, res): Promise<void> => {
   const parsed = FuseGamesBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
