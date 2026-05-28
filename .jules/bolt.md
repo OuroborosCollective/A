@@ -20,3 +20,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 -- Query Plan: Index Scan using messages_conversation_id_idx on messages (cost=0.28..8.30 rows=5 width=1024)
 --              Index Cond: (conversation_id = 123)
 ```
+
+## 2026-05-28 - Optimized asset categorization with Set lookup
+**Learning:** Checking for item existence in an array within a loop using `.some()` or `.includes()` leads to O(N*M) time complexity. For file path lookups or list deduplication, using a `Set` reduces this to O(N+M).
+**Action:** Replaced `Array.prototype.some()` with a `Set.prototype.has()` check in the Game Fusion analyzer's asset categorization loop.

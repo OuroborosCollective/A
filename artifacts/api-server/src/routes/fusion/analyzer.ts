@@ -132,8 +132,10 @@ ${fileSummary || "No code files found"}`;
   }
 
   // Add any remaining asset files not already categorized
+  // Optimization: Using a Set for O(1) lookup instead of O(N) .some() check
+  const categorizedPaths = new Set(categorizedFiles.map(c => c.path));
   for (const af of assetFiles) {
-    if (!categorizedFiles.some(c => c.path === af.path)) {
+    if (!categorizedPaths.has(af.path)) {
       assetCats.push({ path: af.path, category: "asset", reason: "Binary asset file", content: null });
     }
   }
