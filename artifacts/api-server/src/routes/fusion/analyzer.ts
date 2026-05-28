@@ -1,5 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { db, knowledge } from "@workspace/db";
+import { db, knowledge, learningMatrix } from "@workspace/db";
 import { desc, eq, or } from "drizzle-orm";
 
 interface RepoFile {

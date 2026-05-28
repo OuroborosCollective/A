@@ -1,4 +1,4 @@
-import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, serial, text, integer, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,7 +12,9 @@ export const knowledge = pgTable("knowledge", {
   confidence: integer("confidence").default(100),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  index("knowledge_category_confidence_idx").on(table.category, table.confidence),
+]);
 
 export const insertKnowledgeSchema = createInsertSchema(knowledge).omit({
   id: true,

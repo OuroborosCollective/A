@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-16 - Optimized knowledge retrieval with composite database index
+**Learning:** Queries that filter by one column and sort by another (like fetching top-confidence knowledge by category) benefit significantly from composite indexes. This prevents the database from needing to perform a separate sort operation after filtering.
+**Action:** Added a composite index `knowledge_category_confidence_idx` on `(category, confidence)` in the `knowledge` table schema. This optimizes the "Architectural Context" retrieval in the fusion analyzer.
