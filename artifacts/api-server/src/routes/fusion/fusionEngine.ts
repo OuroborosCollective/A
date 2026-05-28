@@ -1,4 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { db, knowledge } from "@workspace/db";
 
 interface FileCategory {
   path: string;
@@ -14,6 +15,7 @@ interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  interfacePatterns?: string[];
 }
 
 interface AnalysisResult {
@@ -91,8 +93,8 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphics, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (player mechanics, physics, collision, AI, scoring, game loop) from Game B
+1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A
+2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B
 3. Combining them into a single working HTML5 web game
 
 The output MUST be:
@@ -187,7 +189,7 @@ If the games are very different, create the best possible fusion explaining the 
     allWarnings.push("No index.html was generated. You may need to manually create an entry point.");
   }
 
-  return {
+  const fusionResult: FusionResult = {
     files: files.map(f => ({
       path: f.path,
       content: f.content,
@@ -197,4 +199,35 @@ If the games are very different, create the best possible fusion explaining the 
     warnings: allWarnings,
     compatibilityScore: Math.min(100, Math.max(0, parsed.compatibilityScore ?? 50)),
   };
+
+  // Record successful fusion knowledge
+  if (fusionResult.compatibilityScore > 70) {
+    try {
+      await db.insert(knowledge).values({
+        category: "fusion_strategy",
+        subCategory: archA.gameGenre || "unknown",
+        key: `${gameA.repoData.owner}/${gameA.repoData.repo}_x_${gameB.repoData.owner}/${gameB.repoData.repo}`,
+        content: {
+          archA: {
+            renderingEngine: archA.renderingEngine,
+            gameGenre: archA.gameGenre,
+            interfacePatterns: archA.interfacePatterns,
+          },
+          archB: {
+            renderingEngine: archB.renderingEngine,
+            gameGenre: archB.gameGenre,
+            interfacePatterns: archB.interfacePatterns,
+          },
+          summary: fusionResult.summary,
+          compatibilityScore: fusionResult.compatibilityScore,
+        },
+        tags: [archA.renderingEngine || "unknown", archB.renderingEngine || "unknown", archA.gameGenre || "unknown"],
+        confidence: fusionResult.compatibilityScore,
+      });
+    } catch (err) {
+      console.error("Failed to save fusion knowledge:", err);
+    }
+  }
+
+  return fusionResult;
 }

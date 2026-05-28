@@ -100,6 +100,11 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
             <CheckCircle2 size={48} className="text-primary" />
           </motion.div>
           <h2 className="text-4xl md:text-5xl font-display font-bold uppercase tracking-widest text-white mb-4">Fusion Complete</h2>
+          <div className="flex items-center gap-4 mb-6 text-xs font-mono tracking-widest uppercase">
+            <span className="text-cyan-400">Graphical Overlay: {gameA.data?.repo}</span>
+            <span className="text-white/20">|</span>
+            <span className="text-fuchsia-400">Logical Structure: {gameB.data?.repo}</span>
+          </div>
           <p className="text-muted-foreground font-mono max-w-3xl mb-10 leading-relaxed text-sm md:text-base">{fusionResult.summary}</p>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 w-full mb-10 text-left">
@@ -204,7 +209,8 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
            "Initiate Fusion between graphics and logic repositories"
          }
          className={cn(
-           "relative z-10 w-72 h-72 rounded-full border-[6px] flex items-center justify-center flex-col gap-4 transition-all duration-700 backdrop-blur-xl shadow-2xl",
+           "relative z-10 w-72 h-72 rounded-full border-[6px] flex items-center justify-center flex-col gap-4 transition-all duration-700 backdrop-blur-xl shadow-2xl outline-none",
+           "focus-visible:ring-4 focus-visible:ring-primary focus-visible:ring-offset-4 focus-visible:ring-offset-background",
            !isReady ? "border-white/10 bg-black/60 text-white/30 cursor-not-allowed" :
            isFusing ? "border-primary bg-primary/10 text-white shadow-[0_0_150px_rgba(0,240,255,0.7)] cursor-wait" :
            "border-white/30 bg-black/80 text-white hover:border-primary hover:bg-primary/5 hover:shadow-[0_0_80px_rgba(0,240,255,0.5)] cursor-pointer hover:scale-105"
@@ -233,8 +239,10 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
              )}>
                {isReady ? (
                  <>INITIATE<br/><span className="text-primary drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]">FUSION</span></>
+               ) : !gameA.data || !gameB.data ? (
+                 <>LINK<br/>REPOS</>
                ) : (
-                 <>AWAITING<br/>DATA</>
+                 <>ANALYZE<br/>CORES</>
                )}
              </span>
            </>

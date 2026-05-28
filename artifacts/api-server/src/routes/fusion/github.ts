@@ -19,6 +19,7 @@ const ASSET_EXTENSIONS = new Set([
 export function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
     const u = new URL(url.trim());
+    if (u.protocol !== "https:") return null;
     if (u.hostname !== "github.com") return null;
     const parts = u.pathname.replace(/^\//, "").replace(/\.git$/, "").split("/");
     if (parts.length < 2) return null;
@@ -104,11 +105,22 @@ export function prioritizeFiles(files: Array<{ path: string; type: string; size:
       let score = 0;
       const p = f.path.toLowerCase();
       if (isCodeFile(f.path)) score += 10;
-      if (p.includes("main") || p.includes("game") || p.includes("index")) score += 5;
-      if (p.includes("player") || p.includes("world") || p.includes("level")) score += 4;
-      if (p.includes("render") || p.includes("scene") || p.includes("canvas")) score += 3;
+
+      // Critical entry points and routing
+      if (p.includes("main") || p.includes("game") || p.includes("index") || p.includes("app") || p.includes("route")) score += 7;
+
+      // Logical structures and data management
+      if (p.includes("player") || p.includes("enemy") || p.includes("ai") || p.includes("physics") || p.includes("collision")) score += 5;
+      if (p.includes("state") || p.includes("store") || p.includes("schema") || p.includes("db") || p.includes("model")) score += 5;
+
+      // Graphical and world layout
+      if (p.includes("world") || p.includes("level") || p.includes("map") || p.includes("tile")) score += 4;
+      if (p.includes("render") || p.includes("scene") || p.includes("canvas") || p.includes("sprite") || p.includes("draw")) score += 4;
+
+      // Project structure
       if (p.includes("src/") || !p.includes("/")) score += 2;
-      if (p.endsWith("package.json") || p.endsWith("readme.md")) score += 3;
+      if (p.endsWith("package.json") || p.endsWith("readme.md") || p.includes("config")) score += 3;
+
       return { ...f, score };
     })
     .sort((a, b) => b.score - a.score);

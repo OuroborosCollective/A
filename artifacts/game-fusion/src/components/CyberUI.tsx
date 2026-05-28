@@ -28,7 +28,7 @@ interface CyberButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>
   accent?: 'cyan' | 'fuchsia';
 }
 
-export const CyberButton = ({ children, className, accent = 'cyan', disabled, ...props }: CyberButtonProps) => {
+export const CyberButton = ({ children, className, accent = 'cyan', disabled, type = "button", ...props }: CyberButtonProps) => {
   const isCyan = accent === 'cyan';
   const baseColors = isCyan 
     ? "border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/20 hover:border-cyan-400 hover:shadow-[0_0_20px_rgba(0,240,255,0.4)] hover:text-cyan-300"
@@ -36,8 +36,10 @@ export const CyberButton = ({ children, className, accent = 'cyan', disabled, ..
     
   return (
     <button 
+      type={type}
       className={cn(
-        "relative px-6 py-3 font-display font-bold tracking-widest uppercase border bg-black/50 transition-all duration-300",
+        "relative px-6 py-3 font-display font-bold tracking-widest uppercase border bg-black/50 transition-all duration-300 outline-none",
+        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-black/50 disabled:hover:shadow-none disabled:hover:border-white/10",
         baseColors,
         className
@@ -64,6 +66,7 @@ export const CyberInput = ({ className, accent = 'cyan', ...props }: CyberInputP
     <input 
       className={cn(
         "bg-black/60 border border-white/10 text-white placeholder:text-white/30 p-3 font-mono text-sm outline-none transition-all duration-300 rounded",
+        "focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         focusColors,
         className
       )}

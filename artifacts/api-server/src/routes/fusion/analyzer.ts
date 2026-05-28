@@ -1,4 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
+import { db, knowledge } from "@workspace/db";
+import { desc, eq, or } from "drizzle-orm";
 
 interface RepoFile {
   path: string;
@@ -31,12 +33,30 @@ interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  interfacePatterns?: string[];
 }
 
 export async function analyzeGameRepo(
   repoData: RepoData,
   role: "graphics" | "logic"
 ): Promise<{ architecture: GameArchitecture; warnings: string[] }> {
+  // Check Learning Matrix for existing knowledge
+  const repoId = `${repoData.owner}/${repoData.repo}`;
+  try {
+    const existing = await db.query.learningMatrix.findFirst({
+      where: eq(learningMatrix.repoIdentifier, repoId),
+    });
+
+    if (existing) {
+      const cached = existing.analysisResult as { architecture: GameArchitecture; warnings: string[] };
+      // Note: We might want to re-run if role changed or content is outdated,
+      // but for "speeding up next time" we return cached if available.
+      return cached;
+    }
+  } catch (err) {
+    console.error("Learning matrix lookup failed:", err);
+  }
+
   const codeFiles = repoData.files.filter(f => f.content);
   const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
 
@@ -47,18 +67,43 @@ export async function analyzeGameRepo(
 
   const assetList = assetFiles.map(f => f.path).join("\n");
 
+  // Fetch relevant knowledge context
+  let knowledgeContext = "";
+  try {
+    const similarKnowledge = await db
+      .select()
+      .from(knowledge)
+      .where(
+        or(
+          eq(knowledge.category, "architecture"),
+          eq(knowledge.category, "fusion_strategy")
+        )
+      )
+      .orderBy(desc(knowledge.confidence))
+      .limit(5);
+
+    if (similarKnowledge.length > 0) {
+      knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
+        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+    }
+  } catch (err) {
+    console.error("Failed to fetch knowledge context:", err);
+  }
+
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and classify files into categories:
-- visual: rendering code, canvas drawing, scene setup, level/world design, tilemap, sprites rendering
-- logic: player controller, physics, collision detection, enemy AI, game state machine, scoring, input handling
-- asset: images, audio, fonts, 3D models, sprite sheets
-- config: package.json, config files, build scripts
-- other: tests, documentation, utilities
+Your task is to analyze the source code and strictly classify files into layers:
+- visual (Visual Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
+- logic (Logical Core): Game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- asset: Images, audio, fonts, 3D models, sprite sheets.
+- config: package.json, config files, build scripts.
+- other: tests, documentation, utilities.
+
+Crucially, identify the "Interfaces" - where the logic layer tells the visual layer what to draw (e.g., event emitters, state subscriptions, or direct function calls like drawPlayer(x, y)).
 
 You must also detect:
 - The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
 - The game genre (e.g., "platformer", "shooter", "puzzle", "rpg", "racing", "strategy")
-- A brief summary of what the game does
+- A brief summary of the game architecture and how the visual and logic layers communicate.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -68,8 +113,11 @@ Return ONLY valid JSON matching this exact structure:
   "categorizedFiles": [
     { "path": "string", "category": "visual|logic|asset|config|other", "reason": "brief reason" }
   ],
+  "interfacePatterns": ["list of strings describing how layers interact"],
   "warnings": ["string"]
-}`;
+}
+
+${knowledgeContext}`;
 
   const userPrompt = `Repository: ${repoData.owner}/${repoData.repo}
 Description: ${repoData.description || "None"}
@@ -99,6 +147,7 @@ ${fileSummary || "No code files found"}`;
     gameGenre?: string | null;
     summary?: string;
     categorizedFiles?: Array<{ path: string; category: string; reason: string }>;
+    interfacePatterns?: string[];
     warnings?: string[];
   };
 
@@ -132,7 +181,7 @@ ${fileSummary || "No code files found"}`;
   }
 
   // Add any remaining asset files not already categorized
-  // Optimization: Using a Set for O(1) lookup instead of O(N) .some() check
+  // Optimization: Use a Set for O(1) path lookups to improve performance from O(N*M) to O(N+M)
   const categorizedPaths = new Set(categorizedFiles.map(c => c.path));
   for (const af of assetFiles) {
     if (!categorizedPaths.has(af.path)) {
@@ -144,7 +193,7 @@ ${fileSummary || "No code files found"}`;
     warnings.push("Could not identify clear game code structure. This may not be a web game repository.");
   }
 
-  return {
+  const result = {
     architecture: {
       renderingEngine: parsed.renderingEngine ?? null,
       gameGenre: parsed.gameGenre ?? null,
@@ -152,7 +201,32 @@ ${fileSummary || "No code files found"}`;
       visualFiles,
       logicFiles,
       assetFiles: assetCats,
+      interfacePatterns: parsed.interfacePatterns ?? [],
     },
     warnings,
   };
+
+  // Save knowledge to Learning Matrix
+  try {
+    await db.insert(learningMatrix).values({
+      repoIdentifier: repoId,
+      renderingEngine: result.architecture.renderingEngine,
+      gameGenre: result.architecture.gameGenre,
+      analysisResult: result,
+      // Detecting structure type could be more sophisticated
+      structureType: repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" : "flat",
+    }).onConflictDoUpdate({
+      target: learningMatrix.repoIdentifier,
+      set: {
+        analysisResult: result,
+        renderingEngine: result.architecture.renderingEngine,
+        gameGenre: result.architecture.gameGenre,
+        updatedAt: new Date(),
+      }
+    });
+  } catch (err) {
+    console.error("Failed to save to learning matrix:", err);
+  }
+
+  return result;
 }
