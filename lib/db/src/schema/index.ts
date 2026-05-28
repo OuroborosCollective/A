@@ -20,3 +20,6 @@
 export * from "./conversations";
 export * from "./messages";
 export * from "./knowledge";
+// BOLT FIX: Exporting learningMatrix to enable the repository analysis cache in the fusion analyzer.
+// This prevents redundant, expensive AI calls by allowing the Drizzle client to access the table.
+export * from "./learning-matrix";
