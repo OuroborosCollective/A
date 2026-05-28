@@ -1,18 +1,26 @@
-import { pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { index, pgTable, serial, text, integer, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
-export const knowledge = pgTable("knowledge", {
-  id: serial("id").primaryKey(),
-  category: text("category").notNull(), // e.g., 'architecture', 'fusion_strategy', 'genre_pattern'
-  subCategory: text("sub_category"), // e.g., 'platformer', 'three.js'
-  key: text("key").notNull(), // e.g., repo identifier or pattern name
-  content: jsonb("content").notNull(), // The learned data structure
-  tags: text("tags").array(),
-  confidence: integer("confidence").default(100),
-  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
-  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-});
+export const knowledge = pgTable(
+  "knowledge",
+  {
+    id: serial("id").primaryKey(),
+    category: text("category").notNull(), // e.g., 'architecture', 'fusion_strategy', 'genre_pattern'
+    subCategory: text("sub_category"), // e.g., 'platformer', 'three.js'
+    key: text("key").notNull(), // e.g., repo identifier or pattern name
+    content: jsonb("content").notNull(), // The learned data structure
+    tags: text("tags").array(),
+    confidence: integer("confidence").default(100),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    // BOLT OPTIMIZATION: Composite index to speed up retrieval of top-rated knowledge by category.
+    // This transforms the O(N) sequential scan into an O(log N) index scan for frequent architectural lookups.
+    index("knowledge_category_confidence_idx").on(table.category, table.confidence)
+  ],
+);
 
 export const insertKnowledgeSchema = createInsertSchema(knowledge).omit({
   id: true,

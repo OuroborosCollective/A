@@ -1,5 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { db, knowledge } from "@workspace/db";
+// BOLT OPTIMIZATION: Import learningMatrix to enable the persistence layer for the Learning Matrix cache.
+import { db, knowledge, learningMatrix } from "@workspace/db";
 import { desc, eq, or } from "drizzle-orm";
 
 interface RepoFile {

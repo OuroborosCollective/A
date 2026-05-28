@@ -147,16 +147,6 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
 
           <div className="grid grid-cols-3 gap-3">
              <StatCard
-a               title="Graphical Overlay"
-               count={state.analysis.architecture.visualFiles.length}
-               accent={accent}
-               description="Visual/Rendering Files"
-             />
-             <StatCard
-               title="Logical Structure"
-               count={state.analysis.architecture.logicFiles.length}
-               accent={accent}
-               description="Mechanics/Data Files"
                title="Visual Payload"
                count={state.analysis.architecture.visualFiles.length}
                accent={accent}
@@ -172,7 +162,7 @@ a               title="Graphical Overlay"
                title="Asset Pack"
                count={state.analysis.architecture.assetFiles.length}
                accent={accent}
-q               description="Count of audio files and static resources"
+               description="Count of audio files and static resources"
              />
           </div>
 

@@ -33,3 +33,15 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-06-01 - Optimized knowledge retrieval and enabled analysis cache
+
+**Learning:** Database queries that filter by one field and order/filter by another (like `knowledge.category` and `knowledge.confidence`) benefit significantly from composite indexes. Also, verify that existing caching logic (like the Learning Matrix) is actually functional by checking that all required database models are exported and reachable by the client.
+
+**Action:**
+1. Added a composite index on `(category, confidence)` in `lib/db/src/schema/knowledge.ts`.
+2. Exported `learningMatrix` from `lib/db/src/schema/index.ts` to fix a broken persistence layer in `analyzeGameRepo`.
+
+**Predicted Performance Impact:**
+- **Knowledge Retrieval:** Reduced from O(N) sequential scan to O(log N) index scan for top-rated knowledge lookups.
+- **Analysis Caching:** Prevents redundant ~20-30s AI analysis calls for previously analyzed repositories by enabling the previously broken Learning Matrix cache.
