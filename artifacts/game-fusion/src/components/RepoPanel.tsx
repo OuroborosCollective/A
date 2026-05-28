@@ -6,6 +6,7 @@ import { Loader2, GitBranch, FolderGit2, Cpu, Image as ImageIcon } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface RepoPanelProps {
   title: string;
@@ -147,16 +148,6 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
 
           <div className="grid grid-cols-3 gap-3">
              <StatCard
-a               title="Graphical Overlay"
-               count={state.analysis.architecture.visualFiles.length}
-               accent={accent}
-               description="Visual/Rendering Files"
-             />
-             <StatCard
-               title="Logical Structure"
-               count={state.analysis.architecture.logicFiles.length}
-               accent={accent}
-               description="Mechanics/Data Files"
                title="Visual Payload"
                count={state.analysis.architecture.visualFiles.length}
                accent={accent}
@@ -172,7 +163,7 @@ a               title="Graphical Overlay"
                title="Asset Pack"
                count={state.analysis.architecture.assetFiles.length}
                accent={accent}
-q               description="Count of audio files and static resources"
+               description="Count of audio files and static resources"
              />
           </div>
 
@@ -197,14 +188,15 @@ q               description="Count of audio files and static resources"
 function StatCard({ title, count, accent, description }: { title: string, count: number, accent: string, description?: string }) {
   const isCyan = accent === 'cyan';
   const content = (
-    <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner h-full w-full ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
-      <span className={`text-3xl font-display font-bold mb-1 ${isCyan ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]' : 'text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]'}`}>{count}</span>
+    <div className={cn(
+      "p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner h-full w-full transition-all duration-300",
+      isCyan ? "border-cyan-900/50 group-hover:border-cyan-500/50 group-focus-visible:border-cyan-500/50" : "border-fuchsia-900/50 group-hover:border-fuchsia-500/50 group-focus-visible:border-fuchsia-500/50"
+    )}>
+      <span className={cn(
+        "text-3xl font-display font-bold mb-1 transition-all duration-300",
+        isCyan ? "text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]" : "text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]"
+      )}>{count}</span>
       <span className="text-[10px] sm:text-xs font-mono uppercase text-muted-foreground">{title}</span>
-      {description && (
-        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/90 border border-white/10 p-2 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
-          {description}
-        </div>
-      )}
     </div>
   );
 
@@ -213,9 +205,12 @@ function StatCard({ title, count, accent, description }: { title: string, count:
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="cursor-help h-full w-full">
+        <button
+          type="button"
+          className="group cursor-help h-full w-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-lg"
+        >
           {content}
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent>
         <p className="text-xs font-mono">{description}</p>
