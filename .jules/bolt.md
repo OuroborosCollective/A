@@ -21,6 +21,9 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 --              Index Cond: (conversation_id = 123)
 ```
 
+## 2026-05-28 - Optimized asset categorization with Set lookup
+**Learning:** Checking for item existence in an array within a loop using `.some()` or `.includes()` leads to O(N*M) time complexity. For file path lookups or list deduplication, using a `Set` reduces this to O(N+M).
+**Action:** Replaced `Array.prototype.some()` with a `Set.prototype.has()` check in the Game Fusion analyzer's asset categorization loop.
 ## 2025-05-15 - Optimized asset categorization loop in fusion analyzer
 
 **Learning:** When dealing with large lists of files (like in a repository scan), nested loops using `Array.prototype.some` or `Array.prototype.includes` can quickly become a performance bottleneck with O(N*M) complexity. Using a `Set` for lookups reduces this to O(N+M).
