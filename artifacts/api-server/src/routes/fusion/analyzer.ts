@@ -1,5 +1,5 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
-import { db, knowledge } from "@workspace/db";
+import { db, knowledge, learningMatrix } from "@workspace/db";
 import { desc, eq, or } from "drizzle-orm";
 
 interface RepoFile {
@@ -57,6 +57,16 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
+  // Detect primary language
+  const extensions: Record<string, number> = {};
+  repoData.files.forEach(f => {
+    const ext = f.path.split(".").pop()?.toLowerCase();
+    if (ext && f.type === "file") {
+      extensions[ext] = (extensions[ext] || 0) + 1;
+    }
+  });
+  const primaryLang = Object.entries(extensions).sort((a, b) => b[1] - a[1])[0]?.[0] || "unknown";
+
   const codeFiles = repoData.files.filter(f => f.content);
   const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
 
@@ -91,14 +101,15 @@ export async function analyzeGameRepo(
   }
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and strictly classify files into layers:
-- visual (Visual Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
-- asset: Images, audio, fonts, 3D models, sprite sheets.
-- config: package.json, config files, build scripts.
-- other: tests, documentation, utilities.
+Your task is to analyze the source code and strictly classify files into layers, maintaining a clear distinction between Logical Core and Graphical Overlay:
 
-Crucially, identify the "Interfaces" - where the logic layer tells the visual layer what to draw (e.g., event emitters, state subscriptions, or direct function calls like drawPlayer(x, y)).
+- visual (Graphical Overlay): This layer handles EVERYTHING the player sees. Rendering code (Canvas, WebGL, Three.js, Phaser renderers), scene graph setup, world/level layout (tilemaps), UI/HUD, sprites rendering, lighting, and animations.
+- logic (Logical Core): This layer handles the internal state and rules. Game mechanics, data structures, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- asset: Static binary files like Images, audio, fonts, 3D models.
+- config: Project configuration like package.json, tsconfig, build scripts.
+- other: Utilities, tests, and documentation.
+
+Crucially, identify the "Interfaces" - the bridge where the logical core signals the graphical overlay to update its state (e.g., event emitters, state subscriptions, or direct calls like 'renderer.draw(player.pos)').
 
 You must also detect:
 - The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
@@ -210,14 +221,17 @@ ${fileSummary || "No code files found"}`;
   try {
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
+      language: primaryLang,
       renderingEngine: result.architecture.renderingEngine,
       gameGenre: result.architecture.gameGenre,
       analysisResult: result,
       // Detecting structure type could be more sophisticated
-      structureType: repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" : "flat",
+      structureType: repoData.files.some(f => f.path.startsWith("src/")) ? "src-driven" :
+                     repoData.files.some(f => f.path.includes("package.json")) ? "node-flat" : "flat",
     }).onConflictDoUpdate({
       target: learningMatrix.repoIdentifier,
       set: {
+        language: primaryLang,
         analysisResult: result,
         renderingEngine: result.architecture.renderingEngine,
         gameGenre: result.architecture.gameGenre,

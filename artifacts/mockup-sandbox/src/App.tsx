@@ -119,15 +119,15 @@ function Gallery() {
 
 function getPreviewPath(): string | null {
   const basePath = getBasePath();
-  const { pathname } = window.location;
+  const pathname = window.location.pathname;
 
-  let local = pathname;
-  if (basePath) {
-    if (pathname === basePath) {
-      local = "/";
-    } else if (pathname.startsWith(basePath + "/")) {
-      local = pathname.slice(basePath.length);
-    }
+  // Normalize paths to handle trailing slashes consistently
+  const normalizedPath = pathname.replace(/\/$/, "") || "/";
+  const normalizedBase = basePath.replace(/\/$/, "");
+
+  let local = normalizedPath;
+  if (normalizedBase && (normalizedPath === normalizedBase || normalizedPath.startsWith(normalizedBase + "/"))) {
+    local = normalizedPath.slice(normalizedBase.length) || "/";
   }
 
   const match = local.match(/^\/preview\/(.+)$/);
