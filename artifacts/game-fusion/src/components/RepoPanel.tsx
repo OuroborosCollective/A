@@ -190,11 +190,6 @@ function StatCard({ title, count, accent, description }: { title: string, count:
     <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner h-full w-full ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
       <span className={`text-3xl font-display font-bold mb-1 ${isCyan ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]' : 'text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]'}`}>{count}</span>
       <span className="text-[10px] sm:text-xs font-mono uppercase text-muted-foreground">{title}</span>
-      {description && (
-        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/90 border border-white/10 p-2 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
-          {description}
-        </div>
-      )}
     </div>
   );
 
@@ -203,9 +198,12 @@ function StatCard({ title, count, accent, description }: { title: string, count:
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="cursor-help h-full w-full">
+        <button
+          className="cursor-help h-full w-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-black rounded-lg transition-shadow"
+          aria-label={`${title}: ${count}. ${description}`}
+        >
           {content}
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent>
         <p className="text-xs font-mono">{description}</p>
