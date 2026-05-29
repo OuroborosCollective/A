@@ -24,6 +24,16 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 ## 2026-05-28 - Optimized asset categorization with Set lookup
 **Learning:** Checking for item existence in an array within a loop using `.some()` or `.includes()` leads to O(N*M) time complexity. For file path lookups or list deduplication, using a `Set` reduces this to O(N+M).
 **Action:** Replaced `Array.prototype.some()` with a `Set.prototype.has()` check in the Game Fusion analyzer's asset categorization loop.
+
+## 2025-05-16 - Added composite index on knowledge(category, confidence)
+
+**Learning:** Queries that filter on one column and sort on another (e.g. `WHERE category = $1 ORDER BY confidence DESC`) benefit significantly from a composite index. Single-column indexes on both columns are often less efficient than one composite index for these specific query patterns.
+
+**Action:** Added a composite index on `(category, confidence)` to the `knowledge` table using Drizzle ORM.
+
+**Predicted Performance Impact:**
+- **Before:** The database might use an index on `category` but then would need to perform a separate sort operation on the resulting rows by `confidence`.
+- **After:** The database can use the composite index to both filter by `category` and retrieve rows in the correct order for `confidence` without an explicit sort step, reducing query execution time and CPU usage.
 ## 2025-05-15 - Optimized asset categorization loop in fusion analyzer
 
 **Learning:** When dealing with large lists of files (like in a repository scan), nested loops using `Array.prototype.some` or `Array.prototype.includes` can quickly become a performance bottleneck with O(N*M) complexity. Using a `Set` for lookups reduces this to O(N+M).
