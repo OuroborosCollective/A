@@ -33,3 +33,13 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-30 - Optimized knowledge retrieval with composite index
+
+**Learning:** Queries that filter on one column and sort on another (e.g., `WHERE category = $1 ORDER BY confidence DESC`) should use a composite index on both columns for optimal performance. Additionally, generating migrations with `drizzle-kit` in environments without a `DATABASE_URL` requires using explicit CLI flags to bypass config file checks.
+
+**Action:** Added a composite index on `(category, confidence)` to the `knowledge` table and generated the corresponding migration.
+
+**Predicted Performance Impact:**
+- **Before:** O(n) sequential scan of the `knowledge` table followed by a sort.
+- **After:** O(log n) index scan, significantly speeding up architectural context retrieval for the AI analyzer.
