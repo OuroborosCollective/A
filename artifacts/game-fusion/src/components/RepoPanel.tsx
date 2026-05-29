@@ -6,6 +6,7 @@ import { Loader2, GitBranch, FolderGit2, Cpu, Image as ImageIcon } from "lucide-
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface RepoPanelProps {
   title: string;
@@ -187,25 +188,33 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
 function StatCard({ title, count, accent, description }: { title: string, count: number, accent: string, description?: string }) {
   const isCyan = accent === 'cyan';
   const content = (
-    <div className={`p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner h-full w-full ${isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'}`}>
-      <span className={`text-3xl font-display font-bold mb-1 ${isCyan ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]' : 'text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]'}`}>{count}</span>
-      <span className="text-[10px] sm:text-xs font-mono uppercase text-muted-foreground">{title}</span>
-      {description && (
-        <div className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-black/90 border border-white/10 p-2 rounded text-[10px] text-white opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
-          {description}
-        </div>
-      )}
-    </div>
+    <span className={cn(
+      "p-4 rounded-lg border text-center flex flex-col items-center justify-center bg-black/60 shadow-inner h-full w-full transition-all duration-200",
+      "group-hover:bg-black/40 group-focus-visible:ring-1 group-focus-visible:ring-primary/50 group-focus-visible:border-primary/50",
+      isCyan ? 'border-cyan-900/50' : 'border-fuchsia-900/50'
+    )}>
+      <span className={cn(
+        "text-3xl font-display font-bold mb-1",
+        isCyan ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(0,240,255,0.8)]' : 'text-fuchsia-400 drop-shadow-[0_0_8px_rgba(255,0,255,0.8)]'
+      )}>
+        {count}
+      </span>
+      <span className="text-[10px] sm:text-xs font-mono uppercase text-muted-foreground tracking-wider">{title}</span>
+    </span>
   );
 
-  if (!description) return content;
+  if (!description) return <div className="group h-full w-full">{content}</div>;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div className="cursor-help h-full w-full">
+        <button
+          type="button"
+          className="group cursor-help h-full w-full outline-none"
+          aria-label={`${title}: ${count}. ${description}`}
+        >
           {content}
-        </div>
+        </button>
       </TooltipTrigger>
       <TooltipContent>
         <p className="text-xs font-mono">{description}</p>
