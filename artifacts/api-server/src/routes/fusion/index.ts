@@ -10,10 +10,11 @@ import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
 import path from "path";
+import { standardLimiter, intensiveLimiter } from "../../middlewares/rateLimiter";
 
 const router: IRouter = Router();
 
-router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
+router.post("/fusion/fetch-repo", intensiveLimiter, async (req, res): Promise<void> => {
   const parsed = FetchRepoBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -78,7 +79,7 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/fusion/analyze", async (req, res): Promise<void> => {
+router.post("/fusion/analyze", intensiveLimiter, async (req, res): Promise<void> => {
   const parsed = AnalyzeRepoBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -98,7 +99,7 @@ router.post("/fusion/analyze", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/fusion/fuse", async (req, res): Promise<void> => {
+router.post("/fusion/fuse", intensiveLimiter, async (req, res): Promise<void> => {
   const parsed = FuseGamesBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
@@ -118,7 +119,7 @@ router.post("/fusion/fuse", async (req, res): Promise<void> => {
   }
 });
 
-router.post("/fusion/download", async (req, res): Promise<void> => {
+router.post("/fusion/download", standardLimiter, async (req, res): Promise<void> => {
   const parsed = DownloadFusedGameBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });

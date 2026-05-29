@@ -7,6 +7,9 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust proxy for correct IP detection behind Replit/proxies
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(
   pinoHttp({
