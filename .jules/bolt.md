@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2026-05-29 - Optimized repo analysis with single-pass logic
+**Learning:** Even simple array operations like `.map()` followed by `.some()` can become expensive when N is large. Combining these operations into a single `for...of` loop with early returns significantly reduces CPU time and memory allocations.
+**Action:** Replaced multi-pass structure detection and Map initialization with optimized manual loops in the Game Fusion analyzer.

@@ -167,7 +167,11 @@ ${fileSummary || "No code files found"}`;
   const categorizedFiles = parsed.categorizedFiles || [];
 
   // Build file maps enriched with content
-  const contentMap = new Map(repoData.files.map(f => [f.path, f.content]));
+  // Performance: Use a manual loop to avoid intermediate array creation from .map()
+  const contentMap = new Map<string, string | null | undefined>();
+  for (const f of repoData.files) {
+    contentMap.set(f.path, f.content);
+  }
 
   const visualFiles: FileCategory[] = [];
   const logicFiles: FileCategory[] = [];
@@ -215,11 +219,25 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
-    const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    // Performance: Optimize structure detection to use a single pass with short-circuiting
+    let structureType: "flat" | "monorepo" | "src-driven" | "node-flat" = "flat";
+    let hasSrc = false;
+    let hasLib = false;
+
+    for (const f of repoData.files) {
+      const p = f.path;
+      if (p.includes("package.json") && p.split("/").length > 2) {
+        structureType = "monorepo";
+        break;
+      }
+      if (!hasSrc && p.startsWith("src/")) hasSrc = true;
+      else if (!hasLib && p.startsWith("lib/")) hasLib = true;
+    }
+
+    if (structureType === "flat") {
+      if (hasSrc) structureType = "src-driven";
+      else if (hasLib) structureType = "node-flat";
+    }
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
