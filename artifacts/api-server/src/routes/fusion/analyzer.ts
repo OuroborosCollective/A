@@ -68,7 +68,7 @@ export async function analyzeGameRepo(
 
   const assetList = assetFiles.map(f => f.path).join("\n");
 
-  // Fetch relevant knowledge context
+  // Fetch relevant knowledge context from Knowledge base and Learning Matrix
   let knowledgeContext = "";
   try {
     const similarKnowledge = await db
@@ -83,9 +83,23 @@ export async function analyzeGameRepo(
       .orderBy(desc(knowledge.confidence))
       .limit(5);
 
-    if (similarKnowledge.length > 0) {
-      knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
-        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+    const matrixEntries = await db
+      .select()
+      .from(learningMatrix)
+      .orderBy(desc(learningMatrix.updatedAt))
+      .limit(3);
+
+    if (similarKnowledge.length > 0 || matrixEntries.length > 0) {
+      knowledgeContext = "\n\n### Architectural Context from previous successful fusions and analyses:\n";
+
+      if (similarKnowledge.length > 0) {
+        knowledgeContext += similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+      }
+
+      if (matrixEntries.length > 0) {
+        knowledgeContext += "\n\n### Learned Repository Patterns:\n" +
+          matrixEntries.map(m => `- ${m.repoIdentifier} (${m.language}, ${m.structureType}): ${m.renderingEngine || "unknown engine"}`).join("\n");
+      }
     }
   } catch (err) {
     console.error("Failed to fetch knowledge context:", err);
@@ -93,13 +107,13 @@ export async function analyzeGameRepo(
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
 Your task is to analyze the source code and strictly classify files into layers to distinguish between "Logical Data Structure" and "Graphical Overlay":
-- visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- visual (Graphical Overlay / Graphical data): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
+- logic (Logical Core / Logical data structure): Game mechanics, state management, data structures, physics, collision math, enemy behavior (AI), input processing, and scoring.
 - asset: Images, audio, fonts, 3D models, sprite sheets.
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, identify the "Logical Routes" - the core paths of data flow, state updates, and internal logic connections. Also identify "Interface Patterns" where the logical data structure informs the graphical overlay what to render.
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -217,9 +231,12 @@ ${fileSummary || "No code files found"}`;
   try {
     let structureType = "flat";
     const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
+    const hasPkgInSubdir = paths.some(p => p.includes("package.json") && p.split("/").length > 2);
+    const hasPnpmWorkspace = paths.some(p => p === "pnpm-workspace.yaml");
+
+    if (hasPkgInSubdir || hasPnpmWorkspace) structureType = "monorepo";
     else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    else if (paths.some(p => p.startsWith("lib/") || p.startsWith("dist/"))) structureType = "node-flat";
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,

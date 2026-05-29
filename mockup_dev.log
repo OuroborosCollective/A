@@ -1,0 +1,30 @@
+
+> @workspace/mockup-sandbox@2.0.0 dev /app/artifacts/mockup-sandbox
+> vite dev
+
+
+  VITE v7.3.1  ready in 585 ms
+
+  ➜  Local:   http://localhost:8081/
+  ➜  Network: http://192.168.0.2:8081/
+9:26:13 PM [vite] Internal server error: Invalid URL
+      at new URL (node:internal/url:818:25)
+      at file:///app/artifacts/mockup-sandbox/node_modules/.vite-temp/vite.config.ts.timestamp-1780089896076-eed487d4e826e.mjs:121:28
+      at call (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10605:5)
+      at next (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10558:4)
+      at cors (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10909:5)
+      at file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10932:9
+      at originCallback (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10926:8)
+      at file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10928:27
+      at optionsCallback (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10916:5)
+      at corsMiddleware$2 (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10919:5)
+      at call (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10605:5)
+      at next (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10558:4)
+      at viteRejectInvalidRequestMiddleware (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:25346:10)
+      at call (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10605:5)
+      at next (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10558:4)
+      at Function.handle (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10560:3)
+      at Server.app (file:///app/node_modules/.pnpm/vite@7.3.1_@types+node@25.3.5_jiti@2.6.1_lightningcss@1.31.1_tsx@4.21.0_yaml@2.8.2/node_modules/vite/dist/node/chunks/config.js:10467:8)
+      at Server.emit (node:events:519:28)
+      at parserOnIncoming (node:_http_server:1186:12)
+      at HTTPParser.parserOnHeadersComplete (node:_http_common:125:17)

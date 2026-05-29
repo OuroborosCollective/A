@@ -16,6 +16,7 @@ interface GameArchitecture {
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
   interfacePatterns?: string[];
+  logicalRoutes?: string[];
 }
 
 interface AnalysisResult {
@@ -129,6 +130,7 @@ Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html m
 Rendering Engine: ${archA.renderingEngine || "unknown"}
 Game Genre: ${archA.gameGenre || "unknown"}  
 Summary: ${archA.summary}
+Interface Patterns (how it draws): ${archA.interfacePatterns?.join(", ") || "none detected"}
 
 Visual Code Files from Game A:
 ${visualContext || "No visual files identified"}
@@ -142,6 +144,7 @@ GAME B (provides logic): ${gameB.repoData.owner}/${gameB.repoData.repo}
 Rendering Engine: ${archB.renderingEngine || "unknown"}
 Game Genre: ${archB.gameGenre || "unknown"}
 Summary: ${archB.summary}
+Logical Routes (how data flows): ${archB.logicalRoutes?.join(", ") || "none detected"}
 
 Logic Code Files from Game B:
 ${logicContext || "No logic files identified"}

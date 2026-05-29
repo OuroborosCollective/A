@@ -104,6 +104,14 @@ export const AnalyzeRepoResponse = zod.object({
         content: zod.string().nullish(),
       }),
     ),
+    interfacePatterns: zod
+      .array(zod.string())
+      .optional()
+      .describe("List of strings describing how layers interact"),
+    logicalRoutes: zod
+      .array(zod.string())
+      .optional()
+      .describe("List of strings describing data flow routes"),
   }),
   warnings: zod.array(zod.string()),
 });
@@ -183,6 +191,14 @@ export const FuseGamesBody = zod.object({
               content: zod.string().nullish(),
             }),
           ),
+          interfacePatterns: zod
+            .array(zod.string())
+            .optional()
+            .describe("List of strings describing how layers interact"),
+          logicalRoutes: zod
+            .array(zod.string())
+            .optional()
+            .describe("List of strings describing data flow routes"),
         }),
         warnings: zod.array(zod.string()),
       }),
@@ -258,6 +274,14 @@ export const FuseGamesBody = zod.object({
               content: zod.string().nullish(),
             }),
           ),
+          interfacePatterns: zod
+            .array(zod.string())
+            .optional()
+            .describe("List of strings describing how layers interact"),
+          logicalRoutes: zod
+            .array(zod.string())
+            .optional()
+            .describe("List of strings describing data flow routes"),
         }),
         warnings: zod.array(zod.string()),
       }),

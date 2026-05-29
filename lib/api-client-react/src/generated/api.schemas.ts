@@ -95,6 +95,10 @@ export interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  /** List of strings describing how layers interact */
+  interfacePatterns?: string[];
+  /** List of strings describing data flow routes */
+  logicalRoutes?: string[];
 }
 
 export interface AnalysisResult {
