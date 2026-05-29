@@ -33,3 +33,14 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-16 - Consolidated multi-pass array processing in analyzer
+
+**Learning:** Combining multiple array operations (`.filter()`, `.map()`, `.some()`) into a single `for...of` loop avoids creating intermediate large arrays and reduces the number of full-collection traversals from O(K*N) to O(N). This is especially critical in the fusion analyzer where `repoData.files` can contain thousands of entries.
+
+**Action:** Refactored `analyzeGameRepo` to use a single pass for file categorization, `contentMap` population, and `structureType` detection.
+
+**Predicted Performance Impact:**
+- **CPU:** Reduced from 5-6 full traversals to 1.
+- **Memory:** Eliminated 3-4 intermediate array allocations (sized O(N)).
+- **Result:** Measurable reduction in garbage collection pressure and latency during heavy repository analysis.
