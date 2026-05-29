@@ -118,8 +118,8 @@ function Gallery() {
 }
 
 function getPreviewPath(): string | null {
-  const basePath = getBasePath().replace(/\/$/, "");
-  const pathname = window.location.pathname.replace(/\/$/, "") || "/";
+  const basePath = getBasePath().replace(/\/+$/, "");
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
 
   let local = pathname;
   if (basePath) {
@@ -129,6 +129,9 @@ function getPreviewPath(): string | null {
       local = pathname.slice(basePath.length);
     }
   }
+
+  // Ensure leading slash for consistent matching
+  if (!local.startsWith("/")) local = "/" + local;
 
   const match = local.match(/^\/preview\/(.+)$/);
   return match ? match[1] : null;

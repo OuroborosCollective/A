@@ -58,6 +58,19 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
+  const paths = repoData.files.map(f => f.path);
+  let structureType = "flat";
+  if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
+  else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
+  else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+
+  const extensions = new Set(paths.map(p => p.split('.').pop()?.toLowerCase()));
+  let detectedLang = "unknown";
+  if (extensions.has("ts") || extensions.has("tsx")) detectedLang = "typescript";
+  else if (extensions.has("js") || extensions.has("jsx")) detectedLang = "javascript";
+  else if (extensions.has("py")) detectedLang = "python";
+  else if (extensions.has("lua")) detectedLang = "lua";
+
   const codeFiles = repoData.files.filter(f => f.content);
   const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
 
@@ -76,16 +89,17 @@ export async function analyzeGameRepo(
       .from(knowledge)
       .where(
         or(
-          eq(knowledge.category, "architecture"),
-          eq(knowledge.category, "fusion_strategy")
+          eq(knowledge.category, "architecture_pattern"),
+          eq(knowledge.category, "fusion_strategy"),
+          eq(knowledge.subCategory, detectedLang)
         )
       )
       .orderBy(desc(knowledge.confidence))
-      .limit(5);
+      .limit(8);
 
     if (similarKnowledge.length > 0) {
-      knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
-        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+      knowledgeContext = "\n\n### Architectural Context & Patterns from previous fusions:\n" +
+        similarKnowledge.map(k => `- [${k.category}] ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
     }
   } catch (err) {
     console.error("Failed to fetch knowledge context:", err);
@@ -99,7 +113,9 @@ Your task is to analyze the source code and strictly classify files into layers 
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, extract and define:
+- "Logical Routes": Trace the exact paths of data flow from user input or game events through state transformations to final game state updates (e.g., "Input Handler -> Action Dispatcher -> State Reducer -> Persistence").
+- "Interface Patterns": Identify the specific communication bridges (APIs, events, observer patterns, or direct function calls) used by the Logical Core to instruct the Graphical Overlay on what to render (e.g., "pub/sub events for state changes", "direct VDOM diffing", "scene-graph update callbacks").
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -213,14 +229,9 @@ ${fileSummary || "No code files found"}`;
     warnings,
   };
 
-  // Save knowledge to Learning Matrix
+  // Save knowledge to Learning Matrix and generalized knowledge
   try {
-    let structureType = "flat";
-    const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
-
+    // Specific repo learning
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
       language: parsed.language || "unknown",
@@ -239,8 +250,36 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Generalized pattern learning
+    await db.insert(knowledge).values({
+      category: "architecture_pattern",
+      subCategory: parsed.language || detectedLang,
+      key: `pattern_${structureType}_${parsed.language || detectedLang}`,
+      content: {
+        structureType,
+        interfacePatterns: result.architecture.interfacePatterns,
+        logicalRoutes: result.architecture.logicalRoutes,
+        renderingEngine: result.architecture.renderingEngine
+      },
+      tags: [parsed.language || detectedLang, structureType, result.architecture.renderingEngine || "unknown"],
+      confidence: 80,
+    }).onConflictDoUpdate({
+      target: knowledge.key,
+      set: {
+        subCategory: parsed.language || detectedLang,
+        content: {
+          structureType,
+          interfacePatterns: result.architecture.interfacePatterns,
+          logicalRoutes: result.architecture.logicalRoutes,
+          renderingEngine: result.architecture.renderingEngine
+        },
+        tags: [parsed.language || detectedLang, structureType, result.architecture.renderingEngine || "unknown"],
+        updatedAt: new Date(),
+      }
+    });
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix or knowledge:", err);
   }
 
   return result;

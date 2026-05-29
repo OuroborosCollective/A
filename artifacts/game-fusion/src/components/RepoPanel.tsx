@@ -166,6 +166,28 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
              />
           </div>
 
+          {(state.analysis.architecture.logicalRoutes?.length ?? 0) > 0 && (
+            <div className={`p-4 rounded-lg border bg-black/40 ${isCyan ? 'border-cyan-500/20' : 'border-fuchsia-500/20'}`}>
+              <h4 className={`text-[10px] font-mono font-bold uppercase mb-2 ${colorClass}`}>Detected Logical Routes</h4>
+              <div className="flex flex-wrap gap-2">
+                {state.analysis.architecture.logicalRoutes?.map((route, i) => (
+                  <span key={i} className="text-[10px] font-mono px-2 py-0.5 bg-white/5 border border-white/10 rounded-full text-white/80">{route}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(state.analysis.architecture.interfacePatterns?.length ?? 0) > 0 && (
+            <div className={`p-4 rounded-lg border bg-black/40 ${isCyan ? 'border-cyan-500/20' : 'border-fuchsia-500/20'}`}>
+              <h4 className={`text-[10px] font-mono font-bold uppercase mb-2 ${colorClass}`}>Interface Patterns</h4>
+              <ul className="text-[10px] font-mono list-disc pl-4 space-y-1 text-white/70">
+                {state.analysis.architecture.interfacePatterns?.map((pattern, i) => (
+                  <li key={i}>{pattern}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           {state.analysis.warnings.length > 0 && (
             <div className="bg-red-950/20 border border-red-500/30 p-4 rounded-lg">
               <h4 className="text-red-400 text-xs font-bold uppercase font-mono mb-2">Compatibility Warnings</h4>
