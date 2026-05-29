@@ -263,6 +263,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileCategory"
+        interfacePatterns:
+          type: array
+          items:
+            type: string
+          description: List of strings describing how layers interact
+        logicalRoutes:
+          type: array
+          items:
+            type: string
+          description: List of strings describing data flow routes
       required:
         - summary
         - visualFiles
