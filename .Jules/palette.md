@@ -1,3 +1,3 @@
-## 2025-05-15 - [Accessibility & Clarity Polish]
-**Learning:** In a complex, theme-heavy interface (like "Cyber" or "Futuristic" styles), semantic elements and explicit ARIA labels are often overlooked in favor of aesthetics. Explicitly associating labels with inputs and providing aria-labels for icon-only or loading states is critical for maintaining accessibility without compromising the visual style.
-**Action:** Always ensure unique IDs are generated for form fields in reusable components (e.g., using a `role` or `id` prop) and provide descriptive `aria-label` content for buttons that transition between icon and text states.
+## 2025-05-15 - Improving StatCard and Button Accessibility
+**Learning:** In the CyberUI ecosystem, some components use manual CSS-based tooltips (like `opacity-0 group-hover:opacity-100`) which are inaccessible to keyboard users and screen readers. Additionally, icon-only buttons often suppress focus outlines (`focus:outline-none`) for visual reasons, which breaks keyboard navigation.
+**Action:** Replace manual tooltips with accessible Radix UI Tooltip components and ensure the trigger is a semantic `<button>` when it needs to be focusable. Always use `focus-visible:ring-2` instead of suppressing focus outlines to maintain accessibility without compromising visual aesthetics for mouse users.
