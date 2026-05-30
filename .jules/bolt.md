@@ -33,3 +33,13 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-16 - Added composite index on knowledge (category, confidence)
+
+**Learning:** Queries that filter on one column and sort on another (e.g., 'WHERE category = $1 ORDER BY confidence DESC') should use a composite index on both columns for optimal performance. This allows the database to locate the filtered rows and have them already sorted by the second column.
+
+**Action:** Added a composite index `knowledge_category_confidence_idx` to the `knowledge` table on `category` and `confidence` columns.
+
+**Predicted Performance Impact:**
+- **Before:** A query like `SELECT * FROM knowledge WHERE category = 'architecture' ORDER BY confidence DESC LIMIT 5` would filter rows by category (potentially using an index on category if one existed, or a sequential scan) and then perform a `Sort` operation on the resulting rows.
+- **After:** The database can use the composite index to find rows for the given category in the correct confidence order directly, avoiding a separate sort step. This is O(log N) for both filtering and ordering.
