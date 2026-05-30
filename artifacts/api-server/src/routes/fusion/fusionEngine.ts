@@ -93,8 +93,8 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B
+1. Taking the "Graphical Overlay" (visual layer, world, level design, rendering, sprites) from Game A
+2. Taking the "Logical Data Structure" (mechanics, player logic, physics, collision, AI, scoring, game loop) from Game B
 3. Combining them into a single working HTML5 web game
 
 The output MUST be:
@@ -103,9 +103,9 @@ The output MUST be:
 - Written in clean, modern JavaScript
 - No external dependencies that aren't available via CDN (if needed, use CDN links)
 
-You MUST adapt and bridge the code:
-- Wire Game A's visual elements to Game B's game loop
-- Replace Game B's rendering calls with Game A's graphics/assets/visual style
+You MUST adapt and bridge the code using identified "Logical Routes" and "Interface Patterns":
+- Wire Game A's "Graphical Overlay" to Game B's "Logical Data Structure" via identified routes.
+- Replace Game B's internal rendering calls with Game A's graphics/assets/visual style.
 - Ensure asset paths reference the actual assets from Game A (use relative paths)
 - Handle the case where the rendering engines differ by adapting the approach
 
