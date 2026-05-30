@@ -1,0 +1,9 @@
+
+> @workspace/mockup-sandbox@2.0.0 dev /app/artifacts/mockup-sandbox
+> vite dev
+
+
+  VITE v7.3.1  ready in 447 ms
+
+  ➜  Local:   http://localhost:8081/
+  ➜  Network: http://192.168.0.2:8081/

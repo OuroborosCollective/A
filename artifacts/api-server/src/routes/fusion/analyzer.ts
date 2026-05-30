@@ -77,35 +77,41 @@ export async function analyzeGameRepo(
       .where(
         or(
           eq(knowledge.category, "architecture"),
-          eq(knowledge.category, "fusion_strategy")
+          eq(knowledge.category, "fusion_strategy"),
+          eq(knowledge.category, "architecture_pattern")
         )
       )
       .orderBy(desc(knowledge.confidence))
-      .limit(5);
+      .limit(8);
 
     if (similarKnowledge.length > 0) {
-      knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
-        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+      knowledgeContext = "\n\n### Architectural Context from previous successful fusions and patterns:\n" +
+        similarKnowledge.map(k => `- ${k.category}/${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
     }
   } catch (err) {
     console.error("Failed to fetch knowledge context:", err);
   }
 
-  const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and strictly classify files into layers to distinguish between "Logical Data Structure" and "Graphical Overlay":
-- visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
-- asset: Images, audio, fonts, 3D models, sprite sheets.
-- config: package.json, config files, build scripts.
-- other: tests, documentation, utilities.
+  const systemPrompt = `You are an expert game developer specializing in structural analysis.
+Your mission is to perform a surgical separation of a game repository into two distinct domains: "Logical Core" and "Graphical Overlay".
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+### Domain Definitions:
+1. **Graphical Overlay (visual)**:
+   - Responsibility: "How it looks and where things are drawn".
+   - Includes: WebGL/Canvas setup, camera systems, particle effects, UI/HUD rendering, sprite/model loaders, animation interpolation, and scene graphs.
+   - Key indicators: Use of 'ctx.draw', 'renderer.render', 'new THREE.Scene()', or DOM manipulation for visuals.
 
-You must also detect:
-- The primary programming language (e.g., "typescript", "javascript", "python", "lua")
-- The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
-- The game genre (e.g., "platformer", "shooter", "puzzle", "rpg", "racing", "strategy")
-- A brief summary of the game architecture and how the visual and logic layers communicate.
+2. **Logical Core (logic)**:
+   - Responsibility: "How it works and the rules of the world".
+   - Includes: State machines, physics engines (velocity, gravity), collision detection math, AI decision trees, input mapping (keys to actions), inventory systems, and score calculations.
+   - Key indicators: Pure functions, classes managing 'entities' or 'components', math-heavy utility files.
+
+### Specific Identifications:
+- **Logical Routes**: Trace the data. For example: "Input -> PlayerController -> EntityState -> CollisionSystem -> GlobalState".
+- **Interface Patterns**: Identify the bridge. How does the logic tell the graphics what to do? Examples: "PubSub events", "Direct method calls on Sprite objects", "React-style state hooks", or "Shared mutable state object".
+
+### Project Analysis:
+Detect the programming language, rendering engine, and game genre. Analyze the folder structure to understand the project's organization.
 
 Return ONLY valid JSON matching this exact structure:
 {
@@ -116,8 +122,14 @@ Return ONLY valid JSON matching this exact structure:
   "categorizedFiles": [
     { "path": "string", "category": "visual|logic|asset|config|other", "reason": "brief reason" }
   ],
-  "interfacePatterns": ["list of strings describing how layers interact"],
-  "logicalRoutes": ["list of strings describing data flow routes"],
+  "interfacePatterns": ["detailed descriptions of interface bridges"],
+  "logicalRoutes": ["explicit data flow paths"],
+  "architecturePattern": {
+    "type": "e.g. ECS, MVC, Event-Driven",
+    "description": "Generalizable pattern of this repo",
+    "folderStructure": "Brief description of the layout"
+  },
+  "detectedStructureType": "monorepo|src-driven|node-flat|flat",
   "warnings": ["string"]
 }
 
@@ -154,6 +166,12 @@ ${fileSummary || "No code files found"}`;
     categorizedFiles?: Array<{ path: string; category: string; reason: string }>;
     interfacePatterns?: string[];
     logicalRoutes?: string[];
+    architecturePattern?: {
+      type: string;
+      description: string;
+      folderStructure: string;
+    };
+    detectedStructureType?: string;
     warnings?: string[];
   };
 
@@ -213,13 +231,20 @@ ${fileSummary || "No code files found"}`;
     warnings,
   };
 
-  // Save knowledge to Learning Matrix
+  // Save knowledge to Learning Matrix and Knowledge table
   try {
-    let structureType = "flat";
     const paths = repoData.files.map(f => f.path);
+    let structureType = "flat";
+
+    // Heuristic detection
     if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
     else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
     else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+
+    // AI-assisted override if valid
+    if (parsed.detectedStructureType && ["monorepo", "src-driven", "node-flat", "flat"].includes(parsed.detectedStructureType)) {
+      structureType = parsed.detectedStructureType;
+    }
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
@@ -239,8 +264,36 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Save generalized architecture pattern
+    if (parsed.architecturePattern) {
+      await db.insert(knowledge).values({
+        category: "architecture_pattern",
+        subCategory: result.architecture.renderingEngine || "vanilla",
+        key: `pattern_${parsed.architecturePattern.type.toLowerCase().replace(/\s+/g, '_')}`,
+        content: parsed.architecturePattern,
+        tags: [parsed.language || "unknown", result.architecture.gameGenre || "unknown", result.architecture.renderingEngine || "unknown"],
+        confidence: 85,
+      }).onConflictDoUpdate({
+        target: [knowledge.category, knowledge.key] as any, // Drizzle doesn't have a clean way for composite keys sometimes, but 'key' is unique-ish or we just insert
+        set: {
+          content: parsed.architecturePattern,
+          updatedAt: new Date(),
+        }
+      }).catch(() => {
+        // Fallback for unique constraint issues
+        return db.insert(knowledge).values({
+          category: "architecture_pattern",
+          subCategory: result.architecture.renderingEngine || "vanilla",
+          key: `pattern_${repoId.replace(/\//g, '_')}`,
+          content: parsed.architecturePattern,
+          tags: [parsed.language || "unknown", result.architecture.gameGenre || "unknown", result.architecture.renderingEngine || "unknown"],
+          confidence: 80,
+        });
+      });
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix or knowledge:", err);
   }
 
   return result;
