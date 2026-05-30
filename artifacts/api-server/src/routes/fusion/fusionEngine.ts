@@ -93,21 +93,22 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B
-3. Combining them into a single working HTML5 web game
+1. Taking the VISUAL LAYER (Graphical Overlay: world, level design, rendering, sprites) from Game A.
+2. Taking the LOGIC LAYER (Logical Data Structure: mechanics, physics, collision, AI, scoring, game loop) from Game B.
+3. Combining them into a single working HTML5 web game.
 
 The output MUST be:
-- A self-contained HTML5 game that runs in a browser (index.html + any supporting JS/CSS files)
-- Fully functional with the visual world of Game A and the gameplay mechanics of Game B
-- Written in clean, modern JavaScript
-- No external dependencies that aren't available via CDN (if needed, use CDN links)
+- A self-contained HTML5 game that runs in a browser (index.html + any supporting JS/CSS files).
+- Optimized for LOCAL execution: Ensure all scripts are included in the ZIP result or via stable CDNs.
+- Fully functional with the visual world of Game A and the gameplay mechanics of Game B.
+- Written in clean, modern JavaScript.
 
 You MUST adapt and bridge the code:
-- Wire Game A's visual elements to Game B's game loop
-- Replace Game B's rendering calls with Game A's graphics/assets/visual style
-- Ensure asset paths reference the actual assets from Game A (use relative paths)
-- Handle the case where the rendering engines differ by adapting the approach
+- Wire Game A's visual elements to Game B's game loop.
+- Replace Game B's rendering calls with Game A's graphics/assets/visual style.
+- Ensure asset paths reference the actual assets from Game A (use relative paths).
+- Handle the case where the rendering engines differ by adapting the approach.
+- Maintain a strict separation in the generated code between the logic core and the graphical overlay to make it readable and maintainable.
 
 Return ONLY valid JSON with this structure:
 {
