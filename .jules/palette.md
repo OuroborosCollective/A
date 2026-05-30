@@ -1,0 +1,3 @@
+## 2025-05-14 - Accessible Tooltip Triggers in StatCards
+**Learning:** [UX/a11y insight] Using a `div` as a `TooltipTrigger` makes the element inaccessible to keyboard users as it is not focusable by default. Additionally, providing redundant manual CSS tooltips alongside standardized accessible components (like Radix UI Tooltip) creates visual clutter and programmatic inconsistency.
+**Action:** [How to apply next time] Always use focusable elements (like `<button type="button">`) for tooltip triggers. Ensure appropriate `aria-label` or `aria-describedby` is present to provide context to screen readers that matches the visual tooltip content. Remove any legacy manual tooltip logic when migrating to accessible components.
