@@ -58,15 +58,39 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
-  const codeFiles = repoData.files.filter(f => f.content);
-  const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
+  // Optimization: Single-pass loop to build content map, summaries, and detect structure
+  // This reduces complexity from O(N) with ~9 passes to O(N) with 1 pass.
+  const contentMap = new Map<string, string | null | undefined>();
+  const codeFileSummaries: string[] = [];
+  const assetPaths: string[] = [];
+  const assetFiles: RepoFile[] = [];
 
-  const fileSummary = codeFiles
-    .slice(0, 30)
-    .map(f => `### ${f.path}\n${(f.content || "").slice(0, 3000)}`)
-    .join("\n\n---\n\n");
+  let hasMonorepo = false;
+  let hasSrc = false;
+  let hasLib = false;
+  let codeCount = 0;
 
-  const assetList = assetFiles.map(f => f.path).join("\n");
+  for (const f of repoData.files) {
+    contentMap.set(f.path, f.content);
+
+    if (f.content) {
+      if (codeCount < 30) {
+        codeFileSummaries.push(`### ${f.path}\n${f.content.slice(0, 3000)}`);
+        codeCount++;
+      }
+    } else if (f.type === "file") {
+      assetFiles.push(f);
+      assetPaths.push(f.path);
+    }
+
+    // Heuristic structure detection
+    if (!hasMonorepo && f.path.includes("package.json") && f.path.split("/").length > 2) hasMonorepo = true;
+    if (!hasSrc && f.path.startsWith("src/")) hasSrc = true;
+    if (!hasLib && f.path.startsWith("lib/")) hasLib = true;
+  }
+
+  const fileSummary = codeFileSummaries.join("\n\n---\n\n");
+  const assetList = assetPaths.join("\n");
 
   // Fetch relevant knowledge context
   let knowledgeContext = "";
@@ -166,9 +190,6 @@ ${fileSummary || "No code files found"}`;
   const warnings: string[] = parsed.warnings || [];
   const categorizedFiles = parsed.categorizedFiles || [];
 
-  // Build file maps enriched with content
-  const contentMap = new Map(repoData.files.map(f => [f.path, f.content]));
-
   const visualFiles: FileCategory[] = [];
   const logicFiles: FileCategory[] = [];
   const assetCats: FileCategory[] = [];
@@ -215,11 +236,7 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
-    const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    const structureType = hasMonorepo ? "monorepo" : hasSrc ? "src-driven" : hasLib ? "node-flat" : "flat";
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,

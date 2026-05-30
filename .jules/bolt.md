@@ -2,7 +2,7 @@
 
 **Learning:** Database tables with foreign keys that are frequently used for filtering (like `conversation_id` in a `messages` table) should always be indexed to avoid full table scans as the dataset grows. In this application, retrieving all messages for a specific conversation is a core operation.
 
-**Action:** Added `index` to the `messages` table on the `conversation_id` column using Drizzle ORM.
+**Action:** Added `index` to the `messages` table on the `conversation_id" column using Drizzle ORM.
 
 **Predicted Performance Impact:**
 - **Before:** A query like `SELECT * FROM messages WHERE conversation_id = $1` would perform a `Seq Scan` (Sequential Scan), which is O(n) where n is the total number of messages in the database.
@@ -33,3 +33,12 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2026-05-29 - Consolidated repository file processing into a single pass
+**Learning:** Processing large arrays with multiple sequential higher-order functions (like `.filter()`, `.map()`, and `.some()`) can lead to significant overhead due to multiple traversals and intermediate array allocations. For repositories with up to 50,000 files, this pattern significantly increases latency and memory pressure.
+
+**Action:** Consolidated approximately 9 separate passes over the `repoData.files` array into a single `for...of` loop in `analyzeGameRepo`. This loop now simultaneously handles content map population, AI prompt building, and repository structure detection.
+
+**Predicted Performance Impact:**
+- **Before:** O(N) complexity but with a high constant factor (~9 passes) and multiple large intermediate array allocations.
+- **After:** O(N) complexity with 1 pass and minimal intermediate allocations. This is expected to reduce processing time by ~70-80% for large repositories and lower the memory ceiling during analysis.
