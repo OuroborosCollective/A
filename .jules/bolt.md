@@ -33,3 +33,11 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2026-05-30 - Optimized architectural context retrieval with composite index
+**Learning:** Queries that filter on one column and sort on another (e.g., 'WHERE category = $1 ORDER BY confidence DESC') should use a composite index on both columns for optimal performance.
+**Action:** Added a composite index on `category` and `confidence` in the `knowledge` table.
+
+## 2026-05-30 - Single-pass repository analysis loop
+**Learning:** Replacing multiple array iterations (.filter, .map, .some) with a single `for...of` loop reduces both time complexity (fewer passes) and space complexity (fewer intermediate array allocations), which is critical when processing large lists of repository files.
+**Action:** Refactored `analyzeGameRepo` to use a single loop for gathering metadata and detecting structure.
