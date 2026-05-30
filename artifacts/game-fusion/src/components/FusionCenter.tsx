@@ -115,7 +115,7 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
                   </h3>
                   <Tooltip>
                     <TooltipTrigger asChild>
-                      <button className="text-primary/50 hover:text-primary transition-colors focus:outline-none" aria-label="About compatibility index">
+                      <button className="text-primary/50 hover:text-primary transition-colors focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-full outline-none" aria-label="About compatibility index">
                         <Info size={16} />
                       </button>
                     </TooltipTrigger>
