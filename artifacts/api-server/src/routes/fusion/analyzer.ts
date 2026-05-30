@@ -77,29 +77,30 @@ export async function analyzeGameRepo(
       .where(
         or(
           eq(knowledge.category, "architecture"),
-          eq(knowledge.category, "fusion_strategy")
+          eq(knowledge.category, "fusion_strategy"),
+          eq(knowledge.category, "architecture_pattern")
         )
       )
       .orderBy(desc(knowledge.confidence))
-      .limit(5);
+      .limit(8);
 
     if (similarKnowledge.length > 0) {
-      knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
-        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+      knowledgeContext = "\n\n### Architectural Context from previous analysis:\n" +
+        similarKnowledge.map(k => `- ${k.category}/${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
     }
   } catch (err) {
     console.error("Failed to fetch knowledge context:", err);
   }
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and strictly classify files into layers to distinguish between "Logical Data Structure" and "Graphical Overlay":
+Your task is to analyze the source code and strictly classify files into layers to clearly distinguish between the "Logical Data Structure" and the "Graphical Overlay":
 - visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- logic (Logical Data Structure): Core data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
 - asset: Images, audio, fonts, 3D models, sprite sheets.
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, identify the "Logical Routes" - the core paths of data flow, state updates, and business logic execution. Also identify "Interface Patterns" where the Logical Data Structure communicates with the Graphical Overlay.
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -217,7 +218,7 @@ ${fileSummary || "No code files found"}`;
   try {
     let structureType = "flat";
     const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
+    if (paths.some(p => p.includes("pnpm-workspace.yaml") || (p.includes("package.json") && p.split("/").length > 2))) structureType = "monorepo";
     else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
     else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
 
@@ -239,8 +240,26 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Extract and save generalized architectural pattern to Knowledge table
+    if (parsed.language && structureType !== "flat") {
+      await db.insert(knowledge).values({
+        category: "architecture_pattern",
+        subCategory: parsed.language,
+        key: `${parsed.language}_${structureType}`,
+        content: {
+          structureType,
+          language: parsed.language,
+          renderingEngine: result.architecture.renderingEngine,
+          interfacePatterns: result.architecture.interfacePatterns,
+          logicalRoutes: result.architecture.logicalRoutes,
+        },
+        tags: [parsed.language, structureType, result.architecture.renderingEngine || "unknown"],
+        confidence: 90,
+      });
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix or knowledge:", err);
   }
 
   return result;

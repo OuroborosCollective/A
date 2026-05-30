@@ -118,8 +118,8 @@ function Gallery() {
 }
 
 function getPreviewPath(): string | null {
-  const basePath = getBasePath().replace(/\/$/, "");
-  const pathname = window.location.pathname.replace(/\/$/, "") || "/";
+  const basePath = getBasePath().replace(/\/+$/, "");
+  const pathname = window.location.pathname.replace(/\/+$/, "") || "/";
 
   let local = pathname;
   if (basePath) {
