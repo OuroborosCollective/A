@@ -16,6 +16,22 @@ const ASSET_EXTENSIONS = new Set([
   ".obj", ".gltf", ".glb", ".fbx"
 ]);
 
+// Pre-compiled regex for file prioritization scoring
+const ENTRY_REGEX = /main|game|index|app|route/i;
+const LOGIC_REGEX = /player|enemy|ai|physics|collision/i;
+const STATE_REGEX = /state|store|schema|db|model/i;
+const WORLD_REGEX = /world|level|map|tile/i;
+const RENDER_REGEX = /render|scene|canvas|sprite|draw/i;
+const CONFIG_REGEX = /(?:package\.json|readme\.md)$|config/i;
+
+export interface ScoredFile {
+  path: string;
+  type: string;
+  size: number;
+  score: number;
+  isCode: boolean;
+}
+
 export function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
     const u = new URL(url.trim());
@@ -89,39 +105,46 @@ export async function fetchFileContent(
 }
 
 export function isCodeFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return CODE_EXTENSIONS.has(ext);
 }
 
 export function isAssetFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return ASSET_EXTENSIONS.has(ext);
 }
 
-export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): Array<{ path: string; type: string; size: number }> {
+export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): ScoredFile[] {
   const scored = files
     .filter(f => f.type === "blob")
     .map(f => {
       let score = 0;
-      const p = f.path.toLowerCase();
-      if (isCodeFile(f.path)) score += 10;
+      const p = f.path;
+      const pLower = p.toLowerCase();
+      const isCode = isCodeFile(p);
+
+      if (isCode) score += 10;
 
       // Critical entry points and routing
-      if (p.includes("main") || p.includes("game") || p.includes("index") || p.includes("app") || p.includes("route")) score += 7;
+      if (ENTRY_REGEX.test(pLower)) score += 7;
 
       // Logical structures and data management
-      if (p.includes("player") || p.includes("enemy") || p.includes("ai") || p.includes("physics") || p.includes("collision")) score += 5;
-      if (p.includes("state") || p.includes("store") || p.includes("schema") || p.includes("db") || p.includes("model")) score += 5;
+      if (LOGIC_REGEX.test(pLower)) score += 5;
+      if (STATE_REGEX.test(pLower)) score += 5;
 
       // Graphical and world layout
-      if (p.includes("world") || p.includes("level") || p.includes("map") || p.includes("tile")) score += 4;
-      if (p.includes("render") || p.includes("scene") || p.includes("canvas") || p.includes("sprite") || p.includes("draw")) score += 4;
+      if (WORLD_REGEX.test(pLower)) score += 4;
+      if (RENDER_REGEX.test(pLower)) score += 4;
 
-      // Project structure
-      if (p.includes("src/") || !p.includes("/")) score += 2;
-      if (p.endsWith("package.json") || p.endsWith("readme.md") || p.includes("config")) score += 3;
+      // Project structure (src/ check is case-insensitive for robustness)
+      if (pLower.includes("src/") || !p.includes("/")) score += 2;
+      if (CONFIG_REGEX.test(pLower)) score += 3;
 
-      return { ...f, score };
+      return { ...f, score, isCode };
     })
     .sort((a, b) => b.score - a.score);
   return scored;

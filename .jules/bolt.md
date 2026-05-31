@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-31 - Optimized file tree processing with single-pass partitioning
+**Learning:** Performing multiple filter passes on large arrays (like repository file trees) leads to redundant iterations. By pre-calculating classification flags (like `isCode`) during an initial prioritization/scoring pass, the list can be partitioned in a single O(N) loop later.
+**Action:** Updated `prioritizeFiles` in `github.ts` to return a `ScoredFile` interface including `isCode`, and refactored the `/fusion/fetch-repo` route in `index.ts` to partition files in a single pass while respecting limits.
