@@ -1,5 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, knowledge } from "@workspace/db";
+import { desc, eq, or } from "drizzle-orm";
 
 interface FileCategory {
   path: string;
@@ -90,6 +91,29 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
     .map(f => f.path)
     .join("\n");
 
+  // Fetch relevant architectural context for fusion
+  let architectureContext = "";
+  try {
+    const similarPatterns = await db
+      .select()
+      .from(knowledge)
+      .where(
+        or(
+          eq(knowledge.category, "architecture_pattern"),
+          eq(knowledge.category, "fusion_strategy")
+        )
+      )
+      .orderBy(desc(knowledge.confidence))
+      .limit(8);
+
+    if (similarPatterns.length > 0) {
+      architectureContext = "\n\n### Learned Architectural Patterns and Fusion Strategies:\n" +
+        similarPatterns.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+    }
+  } catch (err) {
+    console.error("Failed to fetch architectural context:", err);
+  }
+
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
@@ -123,7 +147,9 @@ Return ONLY valid JSON with this structure:
   "warnings": ["any issues or limitations"]
 }
 
-Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html must be the entry point.`;
+Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html must be the entry point.
+
+${architectureContext}`;
 
   const userPrompt = `GAME A (provides visuals): ${gameA.repoData.owner}/${gameA.repoData.repo}
 Rendering Engine: ${archA.renderingEngine || "unknown"}

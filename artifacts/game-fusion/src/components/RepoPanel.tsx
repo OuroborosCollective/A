@@ -166,6 +166,32 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
              />
           </div>
 
+          {state.analysis.architecture.logicalRoutes && state.analysis.architecture.logicalRoutes.length > 0 && (
+            <div className={`p-4 rounded-lg border bg-black/40 ${isCyan ? 'border-cyan-500/20' : 'border-fuchsia-500/20'}`}>
+              <h4 className={`text-xs font-bold uppercase font-mono mb-2 ${colorClass}`}>Logical Routes</h4>
+              <ul className="text-white/70 text-[11px] font-mono list-none space-y-1">
+                {state.analysis.architecture.logicalRoutes.slice(0, 5).map((route, i) => (
+                  <li key={i} className="flex items-start gap-2">
+                    <span className={colorClass}>→</span> {route}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {state.analysis.architecture.interfacePatterns && state.analysis.architecture.interfacePatterns.length > 0 && (
+            <div className={`p-4 rounded-lg border bg-black/40 ${isCyan ? 'border-cyan-500/20' : 'border-fuchsia-500/20'}`}>
+              <h4 className={`text-xs font-bold uppercase font-mono mb-2 ${colorClass}`}>Interface Patterns</h4>
+              <div className="flex flex-wrap gap-2">
+                {state.analysis.architecture.interfacePatterns.map((pattern, i) => (
+                  <span key={i} className={`px-2 py-0.5 rounded text-[10px] font-mono border ${isCyan ? 'bg-cyan-500/10 border-cyan-500/30 text-cyan-400' : 'bg-fuchsia-500/10 border-fuchsia-500/30 text-fuchsia-400'}`}>
+                    {pattern}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {state.analysis.warnings.length > 0 && (
             <div className="bg-red-950/20 border border-red-500/30 p-4 rounded-lg">
               <h4 className="text-red-400 text-xs font-bold uppercase font-mono mb-2">Compatibility Warnings</h4>

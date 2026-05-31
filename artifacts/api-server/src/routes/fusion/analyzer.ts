@@ -99,7 +99,9 @@ Your task is to analyze the source code and strictly classify files into layers 
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Definitions:
+- "Logical Routes": The specific code paths or methods that represent the core state transitions (e.g., "Input -> MovementHandler -> StateUpdate -> CollisionCheck").
+- "Interface Patterns": The mechanism used to bridge the Logical Core and the Graphical Overlay (e.g., "Observer Pattern", "Direct Method Calls", "Event Dispatcher", "Component Hooks").
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -118,7 +120,8 @@ Return ONLY valid JSON matching this exact structure:
   ],
   "interfacePatterns": ["list of strings describing how layers interact"],
   "logicalRoutes": ["list of strings describing data flow routes"],
-  "warnings": ["string"]
+  "warnings": ["string"],
+  "detectedStructureType": "monorepo|src-driven|node-flat|flat|unity|godot"
 }
 
 ${knowledgeContext}`;
@@ -155,6 +158,7 @@ ${fileSummary || "No code files found"}`;
     interfacePatterns?: string[];
     logicalRoutes?: string[];
     warnings?: string[];
+    detectedStructureType?: string;
   };
 
   try {
@@ -215,11 +219,17 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
+    let structureType = parsed.detectedStructureType || "flat";
     const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+
+    // Heuristic fallbacks if AI didn't specify
+    if (structureType === "flat") {
+      if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
+      else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
+      else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+      else if (paths.some(p => p.includes("Assets/") || p.includes("ProjectSettings/"))) structureType = "unity";
+      else if (paths.some(p => p.includes("project.godot"))) structureType = "godot";
+    }
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
@@ -239,8 +249,34 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Also extract and save general architectural knowledge if analysis was high quality
+    if (warnings.length === 0 && parsed.interfacePatterns && parsed.interfacePatterns.length > 0) {
+      await db.insert(knowledge).values({
+        category: "architecture_pattern",
+        subCategory: result.architecture.renderingEngine || "general",
+        key: `pattern_${structureType}_${parsed.language || 'unknown'}`,
+        content: {
+          interfacePatterns: parsed.interfacePatterns,
+          logicalRoutes: parsed.logicalRoutes,
+          summary: parsed.summary,
+        },
+        tags: [parsed.language || "unknown", structureType, result.architecture.gameGenre || "unknown"],
+        confidence: 80,
+      }).onConflictDoUpdate({
+        target: knowledge.key,
+        set: {
+          content: {
+            interfacePatterns: parsed.interfacePatterns,
+            logicalRoutes: parsed.logicalRoutes,
+            summary: parsed.summary,
+          },
+          updatedAt: new Date(),
+        }
+      });
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix/knowledge:", err);
   }
 
   return result;

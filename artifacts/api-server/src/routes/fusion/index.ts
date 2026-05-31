@@ -5,7 +5,7 @@ import {
   FuseGamesBody,
   DownloadFusedGameBody,
 } from "@workspace/api-zod";
-import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
+import { fetchRepoTree, fetchFileContent, fetchFileBuffer, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
 import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
@@ -125,10 +125,10 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
     return;
   }
 
-  const { fusionResult, gameAName, gameBName } = parsed.data;
+  const { fusionResult, gameAName, gameBName, assetsA, ownerA, branchA } = parsed.data;
   const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
-  req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
+  req.log.info({ files: fusionResult.files.length, assets: assetsA?.length, zipName }, "Creating ZIP download");
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
@@ -148,6 +148,29 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
       .replace(/^(\.\.(\/|\\|$))+/, "")
       .replace(/^[\\\/]+/, "");
     archive.append(file.content, { name: sanitizedPath });
+  }
+
+  // Add original assets from Game A
+  if (assetsA && assetsA.length > 0) {
+    const MAX_ASSETS = 50;
+    const assetsToFetch = assetsA.slice(0, MAX_ASSETS);
+
+    for (const asset of assetsToFetch) {
+      const sanitizedPath = path
+        .normalize(asset.path)
+        .replace(/^(\.\.(\/|\\|$))+/, "")
+        .replace(/^[\\\/]+/, "");
+
+      if (asset.content) {
+        archive.append(asset.content, { name: sanitizedPath });
+      } else if (ownerA && branchA) {
+        // Fetch binary content if owner/branch are provided
+        const buffer = await fetchFileBuffer(ownerA, gameAName, branchA, asset.path);
+        if (buffer) {
+          archive.append(buffer, { name: sanitizedPath });
+        }
+      }
+    }
   }
 
   // Add a README with fusion summary

@@ -67,7 +67,10 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
         data: {
           fusionResult,
           gameAName: gameA.data.repo,
-          gameBName: gameB.data.repo
+          gameBName: gameB.data.repo,
+          ownerA: gameA.data.owner,
+          branchA: gameA.data.defaultBranch,
+          assetsA: gameA.data.files.filter(f => !f.content)
         }
       });
       const url = window.URL.createObjectURL(blob);
