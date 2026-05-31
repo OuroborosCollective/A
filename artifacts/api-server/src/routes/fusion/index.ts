@@ -37,8 +37,20 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
 
     // Fetch up to MAX_FILES_TO_FETCH code files
     const MAX_FILES = 40;
-    const toFetch = prioritized.filter(f => isCodeFile(f.path)).slice(0, MAX_FILES);
-    const assetFiles = prioritized.filter(f => !isCodeFile(f.path));
+
+    // Single pass to partition files for fetching and asset tracking
+    const toFetch: typeof prioritized = [];
+    const assetFiles: typeof prioritized = [];
+
+    for (const f of prioritized) {
+      if (f.isCode) {
+        if (toFetch.length < MAX_FILES) {
+          toFetch.push(f);
+        }
+      } else {
+        assetFiles.push(f);
+      }
+    }
 
     req.log.info({ owner, repo, totalFiles, toFetch: toFetch.length }, "Fetching repo files");
 
