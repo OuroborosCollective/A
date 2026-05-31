@@ -168,6 +168,13 @@ ${fusionResult.files.map(f => `- ${f.path}: ${f.description}`).join("\n")}
 ## How to run
 1. Open index.html in a modern browser, or
 2. Serve via a local server: npx serve .
+
+## Note on Assets
+The fusion process uses the logical structure of one game and the graphical overlay of another.
+If binary assets (images, audio) were not included in the source fetch, the generated code might use:
+- Placeholder colored rectangles
+- CDN links for common libraries
+- Relative paths to original assets (you may need to copy these from the original repository into this folder)
 `;
   archive.append(readme, { name: "README.md" });
 

@@ -166,6 +166,32 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
              />
           </div>
 
+          {(state.analysis.architecture.logicalRoutes?.length ?? 0) > 0 && (
+            <div className="bg-black/60 p-4 rounded-lg border border-white/5">
+              <h4 className={`text-[10px] font-mono font-bold uppercase mb-2 ${colorClass}`}>Logical Routes Detected</h4>
+              <div className="flex flex-wrap gap-2">
+                {state.analysis.architecture.logicalRoutes?.map((route, i) => (
+                  <span key={i} className="text-[10px] font-mono bg-white/5 border border-white/10 px-2 py-1 rounded text-white/70">
+                    {route}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(state.analysis.architecture.interfacePatterns?.length ?? 0) > 0 && (
+            <div className="bg-black/60 p-4 rounded-lg border border-white/5">
+              <h4 className={`text-[10px] font-mono font-bold uppercase mb-2 ${colorClass}`}>Interface Patterns</h4>
+              <div className="flex flex-wrap gap-2">
+                {state.analysis.architecture.interfacePatterns?.map((pattern, i) => (
+                  <span key={i} className="text-[10px] font-mono bg-white/5 border border-white/10 px-2 py-1 rounded text-white/70">
+                    {pattern}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {state.analysis.warnings.length > 0 && (
             <div className="bg-red-950/20 border border-red-500/30 p-4 rounded-lg">
               <h4 className="text-red-400 text-xs font-bold uppercase font-mono mb-2">Compatibility Warnings</h4>

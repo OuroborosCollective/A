@@ -93,13 +93,15 @@ export async function analyzeGameRepo(
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
 Your task is to analyze the source code and strictly classify files into layers to distinguish between "Logical Data Structure" and "Graphical Overlay":
-- visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations. This layer is responsible for EVERYTHING the player SEES.
+- logic (Logical Core): Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring. This layer is the "BRAIN" and holds the source of truth for the game state.
 - asset: Images, audio, fonts, 3D models, sprite sheets.
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, identify:
+1. "Logical Routes": The specific code paths or methods that represent core game loops or data flows (e.g., "input -> updatePlayer -> checkCollision -> updateState").
+2. "Interface Patterns": How the Logic Layer communicates with the Graphical Overlay (e.g., "Logic emits events that Graphics listens to", or "Graphics reads from a global state object").
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -215,11 +217,15 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
     const paths = repoData.files.map(f => f.path);
+    let structureType = "flat";
+
+    // Improved structure detection
     if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
     else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
     else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    else if (paths.some(p => p.includes("Assets/") || p.includes("ProjectSettings/"))) structureType = "unity";
+    else if (paths.some(p => p.includes("project.godot"))) structureType = "godot";
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
@@ -239,8 +245,26 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Extract generalized architectural pattern
+    if (parsed.language && result.architecture.renderingEngine) {
+      await db.insert(knowledge).values({
+        category: "architecture_pattern",
+        subCategory: result.architecture.renderingEngine,
+        key: `pattern_${parsed.language}_${result.architecture.renderingEngine}`,
+        content: {
+          structureType,
+          language: parsed.language,
+          interfacePatterns: result.architecture.interfacePatterns,
+          logicalRoutes: result.architecture.logicalRoutes,
+          typicalFiles: categorizedFiles.slice(0, 5).map(f => ({ path: f.path, category: f.category }))
+        },
+        tags: [parsed.language, result.architecture.renderingEngine, structureType],
+        confidence: 80,
+      }).onConflictDoNothing();
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix or knowledge:", err);
   }
 
   return result;
