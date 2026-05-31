@@ -73,7 +73,7 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
     if (message.includes("not found") || message.includes("private") || message.includes("too large") || message.includes("rate limit")) {
       res.status(422).json({ error: message });
     } else {
-      res.status(500).json({ error: message });
+      res.status(500).json({ error: "Internal Server Error" });
     }
   }
 });
@@ -94,7 +94,7 @@ router.post("/fusion/analyze", async (req, res): Promise<void> => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     req.log.error({ error: message }, "Analysis failed");
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
@@ -114,7 +114,7 @@ router.post("/fusion/fuse", async (req, res): Promise<void> => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     req.log.error({ error: message }, "Fusion failed");
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
