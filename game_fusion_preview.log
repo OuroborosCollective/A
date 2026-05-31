@@ -1,6 +1,0 @@
-
-> @workspace/game-fusion@0.0.0 serve /app/artifacts/game-fusion
-> vite preview --config vite.config.ts --host 0.0.0.0
-
-  ➜  Local:   http://localhost:3000/
-  ➜  Network: http://192.168.0.2:3000/

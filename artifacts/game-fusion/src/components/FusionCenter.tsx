@@ -192,7 +192,7 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
            >
               <img 
                 src={`${import.meta.env.BASE_URL}images/fusion-core.png`} 
-                alt="Glowing Core" 
+                alt=""
                 className={`w-[500px] h-[500px] object-cover transition-all duration-[2000ms] ${isFusing ? 'scale-125 saturate-200 rotate-180 opacity-80' : 'scale-100 opacity-50 hover:opacity-70'}`} 
               />
            </motion.div>
