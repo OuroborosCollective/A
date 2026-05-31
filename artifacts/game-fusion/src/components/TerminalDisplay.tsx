@@ -31,13 +31,13 @@ export const TerminalDisplay = ({ title, items, className, accent = 'cyan' }: Te
         {/* CRT Scanline overlay effect */}
         <div className="absolute inset-0 pointer-events-none bg-[linear-gradient(to_bottom,transparent_50%,rgba(0,0,0,0.3)_51%)] bg-[length:100%_4px] opacity-60 mix-blend-overlay z-20" />
         
-        <div className={cn("relative z-10 w-full flex flex-col", isCyan ? "text-cyan-500/80" : "text-fuchsia-500/80")}>
+        <ul className={cn("relative z-10 w-full flex flex-col", isCyan ? "text-cyan-500/80" : "text-fuchsia-500/80")}>
           {items.map((item, idx) => (
-            <div key={idx} className="w-full">
+            <li key={idx} className="w-full">
               {item}
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       </div>
     </div>
   );
