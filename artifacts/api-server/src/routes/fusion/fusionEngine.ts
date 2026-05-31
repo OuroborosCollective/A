@@ -1,5 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, knowledge } from "@workspace/db";
+import { desc, eq } from "drizzle-orm";
 
 interface FileCategory {
   path: string;
@@ -16,6 +17,7 @@ interface GameArchitecture {
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
   interfacePatterns?: string[];
+  logicalRoutes?: string[];
 }
 
 interface AnalysisResult {
@@ -90,11 +92,29 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
     .map(f => f.path)
     .join("\n");
 
+  // Fetch relevant knowledge context for fusion
+  let knowledgeContext = "";
+  try {
+    const similarKnowledge = await db
+      .select()
+      .from(knowledge)
+      .where(eq(knowledge.category, "fusion_strategy"))
+      .orderBy(desc(knowledge.confidence))
+      .limit(5);
+
+    if (similarKnowledge.length > 0) {
+      knowledgeContext = "\n\n### Historical Fusion Strategies:\n" +
+        similarKnowledge.map(k => `- Strategy: ${JSON.stringify(k.content)}`).join("\n");
+    }
+  } catch (err) {
+    console.error("Failed to fetch fusion knowledge context:", err);
+  }
+
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B
+1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A. This is the "Graphical Overlay".
+2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B. This is the "Logical Data Structure".
 3. Combining them into a single working HTML5 web game
 
 The output MUST be:
@@ -123,12 +143,15 @@ Return ONLY valid JSON with this structure:
   "warnings": ["any issues or limitations"]
 }
 
-Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html must be the entry point.`;
+Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html must be the entry point.
+
+${knowledgeContext}`;
 
   const userPrompt = `GAME A (provides visuals): ${gameA.repoData.owner}/${gameA.repoData.repo}
 Rendering Engine: ${archA.renderingEngine || "unknown"}
 Game Genre: ${archA.gameGenre || "unknown"}  
 Summary: ${archA.summary}
+Interface Patterns (A): ${archA.interfacePatterns?.join(", ") || "None"}
 
 Visual Code Files from Game A:
 ${visualContext || "No visual files identified"}
@@ -142,6 +165,7 @@ GAME B (provides logic): ${gameB.repoData.owner}/${gameB.repoData.repo}
 Rendering Engine: ${archB.renderingEngine || "unknown"}
 Game Genre: ${archB.gameGenre || "unknown"}
 Summary: ${archB.summary}
+Logical Routes (B): ${archB.logicalRoutes?.join(", ") || "None"}
 
 Logic Code Files from Game B:
 ${logicContext || "No logic files identified"}

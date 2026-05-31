@@ -6,7 +6,7 @@ export const knowledge = pgTable("knowledge", {
   id: serial("id").primaryKey(),
   category: text("category").notNull(), // e.g., 'architecture', 'fusion_strategy', 'genre_pattern'
   subCategory: text("sub_category"), // e.g., 'platformer', 'three.js'
-  key: text("key").notNull(), // e.g., repo identifier or pattern name
+  key: text("key").notNull().unique(), // e.g., repo identifier or pattern name
   content: jsonb("content").notNull(), // The learned data structure
   tags: text("tags").array(),
   confidence: integer("confidence").default(100),

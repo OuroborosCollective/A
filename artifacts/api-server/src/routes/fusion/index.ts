@@ -125,10 +125,10 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
     return;
   }
 
-  const { fusionResult, gameAName, gameBName } = parsed.data;
+  const { fusionResult, gameAName, gameBName, assetsA } = parsed.data;
   const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
-  req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
+  req.log.info({ files: fusionResult.files.length, assets: assetsA?.length, zipName }, "Creating ZIP download");
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
@@ -140,14 +140,41 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
 
   archive.pipe(res);
 
+  const sanitizedPaths = new Set<string>();
+
   for (const file of fusionResult.files) {
-    // Sanitize the file path to prevent directory traversal within the ZIP
-    // We want to ensure paths are relative and don't escape the archive root
     const sanitizedPath = path
       .normalize(file.path)
       .replace(/^(\.\.(\/|\\|$))+/, "")
       .replace(/^[\\\/]+/, "");
-    archive.append(file.content, { name: sanitizedPath });
+
+    if (sanitizedPath && !sanitizedPaths.has(sanitizedPath)) {
+      archive.append(file.content, { name: sanitizedPath });
+      sanitizedPaths.add(sanitizedPath);
+    }
+  }
+
+  // Bundle Game A assets if available
+  if (assetsA && assetsA.length > 0) {
+    for (const asset of assetsA) {
+      const sanitizedPath = path
+        .normalize(asset.path)
+        .replace(/^(\.\.(\/|\\|$))+/, "")
+        .replace(/^[\\\/]+/, "");
+
+      if (sanitizedPath && !sanitizedPaths.has(sanitizedPath)) {
+        // AI-generated files take precedence over original assets if path collision occurs
+        // but here we already checked sanitizedPaths.has(sanitizedPath)
+
+        // Note: For binary assets, content might be null in our current RepoFile structure
+        // If content is null, we can't really bundle it unless we fetch it here.
+        // For now, we bundle what we have.
+        if (asset.content) {
+          archive.append(asset.content, { name: sanitizedPath });
+          sanitizedPaths.add(sanitizedPath);
+        }
+      }
+    }
   }
 
   // Add a README with fusion summary

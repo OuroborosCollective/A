@@ -29,6 +29,7 @@ interface FileCategory {
 interface GameArchitecture {
   renderingEngine: string | null;
   gameGenre: string | null;
+  language?: string;
   summary: string;
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
@@ -76,16 +77,16 @@ export async function analyzeGameRepo(
       .from(knowledge)
       .where(
         or(
-          eq(knowledge.category, "architecture"),
+          eq(knowledge.category, "architecture_pattern"),
           eq(knowledge.category, "fusion_strategy")
         )
       )
       .orderBy(desc(knowledge.confidence))
-      .limit(5);
+      .limit(8);
 
     if (similarKnowledge.length > 0) {
       knowledgeContext = "\n\n### Architectural Context from previous successful fusions:\n" +
-        similarKnowledge.map(k => `- ${k.subCategory} (${k.tags?.join(", ")}): ${JSON.stringify(k.content)}`).join("\n");
+        similarKnowledge.map(k => `- Category: ${k.category}, Sub: ${k.subCategory}, Tags: ${k.tags?.join(", ")}, Patterns: ${JSON.stringify(k.content)}`).join("\n");
     }
   } catch (err) {
     console.error("Failed to fetch knowledge context:", err);
@@ -99,7 +100,9 @@ Your task is to analyze the source code and strictly classify files into layers 
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, identify:
+1. "Logical Routes": The specific paths of data flow and state updates. Examples: "Keyboard Input -> Player State -> Physics Engine", "Collision Event -> Health Reduction -> Game Over Check".
+2. "Interface Patterns": The bridges or contracts where the logic layer signals the visual layer. Examples: "State Emitter -> Sprite Update", "Logic Event -> Animation Playback", "Physics Body -> Canvas Translation".
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -154,6 +157,7 @@ ${fileSummary || "No code files found"}`;
     categorizedFiles?: Array<{ path: string; category: string; reason: string }>;
     interfacePatterns?: string[];
     logicalRoutes?: string[];
+    detectedStructureType?: string;
     warnings?: string[];
   };
 
@@ -203,6 +207,7 @@ ${fileSummary || "No code files found"}`;
     architecture: {
       renderingEngine: parsed.renderingEngine ?? null,
       gameGenre: parsed.gameGenre ?? null,
+      language: parsed.language ?? "unknown",
       summary: parsed.summary ?? "Game analysis complete",
       visualFiles,
       logicFiles,
@@ -215,11 +220,16 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
     const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    let structureType = parsed.detectedStructureType || "flat";
+
+    if (structureType === "flat") {
+      if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
+      else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
+      else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+      else if (paths.some(p => p.startsWith("Assets/") || p.includes("/Assets/"))) structureType = "unity";
+      else if (paths.some(p => p.endsWith("project.godot"))) structureType = "godot";
+    }
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
@@ -239,8 +249,39 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Extract and save generalized architectural patterns to knowledge table
+    if (result.architecture.interfacePatterns?.length || result.architecture.logicalRoutes?.length) {
+      const patternKey = `${parsed.language}_${result.architecture.renderingEngine}_${structureType}`;
+      await db.insert(knowledge).values({
+        category: "architecture_pattern",
+        subCategory: result.architecture.gameGenre || "unknown",
+        key: patternKey,
+        content: {
+          interfacePatterns: result.architecture.interfacePatterns,
+          logicalRoutes: result.architecture.logicalRoutes,
+          structureType,
+          language: parsed.language,
+          renderingEngine: result.architecture.renderingEngine,
+        },
+        tags: [parsed.language || "unknown", result.architecture.renderingEngine || "unknown", structureType],
+        confidence: 80, // Default confidence for AI-extracted patterns
+      }).onConflictDoUpdate({
+        target: knowledge.key,
+        set: {
+          content: {
+            interfacePatterns: result.architecture.interfacePatterns,
+            logicalRoutes: result.architecture.logicalRoutes,
+            structureType,
+            language: parsed.language,
+            renderingEngine: result.architecture.renderingEngine,
+          },
+          updatedAt: new Date(),
+        }
+      });
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix or knowledge:", err);
   }
 
   return result;

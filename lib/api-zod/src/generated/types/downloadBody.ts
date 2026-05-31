@@ -5,10 +5,12 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { FileCategory } from "./fileCategory";
 import type { FusionResult } from "./fusionResult";
 
 export interface DownloadBody {
   fusionResult: FusionResult;
   gameAName: string;
   gameBName: string;
+  assetsA?: FileCategory[];
 }

@@ -357,6 +357,10 @@ components:
           type: string
         gameBName:
           type: string
+        assetsA:
+          type: array
+          items:
+            $ref: "#/components/schemas/FileCategory"
       required:
         - fusionResult
         - gameAName

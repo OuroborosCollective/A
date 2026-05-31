@@ -67,7 +67,8 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
         data: {
           fusionResult,
           gameAName: gameA.data.repo,
-          gameBName: gameB.data.repo
+          gameBName: gameB.data.repo,
+          assetsA: gameA.analysis?.architecture.assetFiles || []
         }
       });
       const url = window.URL.createObjectURL(blob);
