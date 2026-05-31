@@ -1,5 +1,6 @@
 import { openai } from "@workspace/integrations-openai-ai-server";
 import { db, knowledge } from "@workspace/db";
+import { eq, or } from "drizzle-orm";
 
 interface FileCategory {
   path: string;
@@ -66,6 +67,24 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
     ...gameB.analysis.warnings.map(w => `Game B: ${w}`),
   ];
 
+  // Fetch relevant knowledge patterns for these engines/genres
+  let architecturalKnowledge = "";
+  try {
+    const patterns = await db.select().from(knowledge).where(
+      or(
+        eq(knowledge.category, "architecture_pattern"),
+        eq(knowledge.category, "fusion_strategy")
+      )
+    ).limit(8);
+
+    if (patterns.length > 0) {
+      architecturalKnowledge = "\n### Learned Architectural Patterns & Strategies:\n" +
+        patterns.map(p => `- ${p.subCategory}: ${JSON.stringify(p.content)}`).join("\n");
+    }
+  } catch (err) {
+    console.error("Knowledge retrieval failed:", err);
+  }
+
   // Check rendering engine compatibility
   if (archA.renderingEngine && archB.renderingEngine && archA.renderingEngine !== archB.renderingEngine) {
     warnings.push(
@@ -123,12 +142,16 @@ Return ONLY valid JSON with this structure:
   "warnings": ["any issues or limitations"]
 }
 
-Generate a COMPLETE, WORKING game. Do not use placeholder code. The index.html must be the entry point.`;
+Generate a COMPLETE, WORKING game. Do not use placeholder code for LOGIC. The index.html must be the entry point.
+If a visual asset (image/audio) is needed but its content is not available, you MUST:
+1. Use a relative path to where the asset would be (e.g., 'assets/player.png')
+2. AS A FALLBACK in the code, if the asset fails to load, draw a colored placeholder (e.g., a red rectangle for the player) or use a stable CDN link for common assets.`;
 
-  const userPrompt = `GAME A (provides visuals): ${gameA.repoData.owner}/${gameA.repoData.repo}
+  const userPrompt = `GAME A (provides VISUAL OVERLAY): ${gameA.repoData.owner}/${gameA.repoData.repo}
 Rendering Engine: ${archA.renderingEngine || "unknown"}
 Game Genre: ${archA.gameGenre || "unknown"}  
 Summary: ${archA.summary}
+Interface Patterns: ${(archA as any).interfacePatterns?.join(", ") || "None detected"}
 
 Visual Code Files from Game A:
 ${visualContext || "No visual files identified"}
@@ -138,13 +161,16 @@ ${assetList || "No assets identified"}
 
 ---
 
-GAME B (provides logic): ${gameB.repoData.owner}/${gameB.repoData.repo}
+GAME B (provides LOGICAL DATA STRUCTURE): ${gameB.repoData.owner}/${gameB.repoData.repo}
 Rendering Engine: ${archB.renderingEngine || "unknown"}
 Game Genre: ${archB.gameGenre || "unknown"}
 Summary: ${archB.summary}
+Logical Routes: ${(archB as any).logicalRoutes?.join(", ") || "None detected"}
 
 Logic Code Files from Game B:
 ${logicContext || "No logic files identified"}
+
+${architecturalKnowledge}
 
 ---
 

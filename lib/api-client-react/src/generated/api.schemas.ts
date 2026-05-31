@@ -95,6 +95,8 @@ export interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  interfacePatterns?: string[];
+  logicalRoutes?: string[];
 }
 
 export interface AnalysisResult {

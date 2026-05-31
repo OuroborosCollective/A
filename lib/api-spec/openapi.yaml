@@ -263,6 +263,14 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileCategory"
+        interfacePatterns:
+          type: array
+          items:
+            type: string
+        logicalRoutes:
+          type: array
+          items:
+            type: string
       required:
         - summary
         - visualFiles
