@@ -99,12 +99,13 @@ Your task is to analyze the source code and strictly classify files into layers 
 - config: package.json, config files, build scripts.
 - other: tests, documentation, utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interface Patterns" where the logic layer tells the visual layer what to draw or how they bridge.
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
 - The rendering engine/framework (e.g., "canvas2d", "three.js", "phaser", "pixi.js", "webgl", "babylon.js", "vanilla")
 - The game genre (e.g., "platformer", "shooter", "puzzle", "rpg", "racing", "strategy")
+- The Project Structure Type (e.g., "monorepo", "src-driven", "node-flat", "unity", "godot", "flat")
 - A brief summary of the game architecture and how the visual and logic layers communicate.
 
 Return ONLY valid JSON matching this exact structure:
@@ -112,6 +113,7 @@ Return ONLY valid JSON matching this exact structure:
   "language": "string",
   "renderingEngine": "string or null",
   "gameGenre": "string or null", 
+  "detectedStructureType": "string",
   "summary": "string",
   "categorizedFiles": [
     { "path": "string", "category": "visual|logic|asset|config|other", "reason": "brief reason" }
@@ -150,6 +152,7 @@ ${fileSummary || "No code files found"}`;
     language?: string;
     renderingEngine?: string | null;
     gameGenre?: string | null;
+    detectedStructureType?: string;
     summary?: string;
     categorizedFiles?: Array<{ path: string; category: string; reason: string }>;
     interfacePatterns?: string[];
@@ -215,11 +218,17 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
+    let structureType = parsed.detectedStructureType || "flat";
     const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+
+    // Heuristic fallback if AI is unsure
+    if (structureType === "flat") {
+      if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
+      else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
+      else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+      else if (paths.some(p => p.includes("Assets/") || p.includes("ProjectSettings/"))) structureType = "unity";
+      else if (paths.some(p => p.includes("project.godot"))) structureType = "godot";
+    }
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
@@ -239,8 +248,34 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Extract discrete architectural patterns for future context
+    if (result.architecture.interfacePatterns?.length || result.architecture.logicalRoutes?.length) {
+      await db.insert(knowledge).values({
+        category: "architecture",
+        subCategory: result.architecture.renderingEngine || "general",
+        key: `patterns:${repoId}`,
+        content: {
+          interfacePatterns: result.architecture.interfacePatterns,
+          logicalRoutes: result.architecture.logicalRoutes,
+          summary: result.architecture.summary
+        },
+        tags: [parsed.language || "unknown", result.architecture.gameGenre || "unknown"],
+        confidence: 90
+      }).onConflictDoUpdate({
+        target: knowledge.key,
+        set: {
+          content: {
+            interfacePatterns: result.architecture.interfacePatterns,
+            logicalRoutes: result.architecture.logicalRoutes,
+            summary: result.architecture.summary
+          },
+          updatedAt: new Date()
+        }
+      });
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save to learning matrix or knowledge:", err);
   }
 
   return result;

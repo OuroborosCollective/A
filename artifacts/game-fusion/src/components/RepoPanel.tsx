@@ -166,6 +166,32 @@ export function RepoPanel({ title, role, accent, state, onStateChange }: RepoPan
              />
           </div>
 
+          {state.analysis.architecture.logicalRoutes && state.analysis.architecture.logicalRoutes.length > 0 && (
+            <TerminalDisplay
+              accent={accent}
+              title="Detected Logical Routes"
+              items={state.analysis.architecture.logicalRoutes.map((route, i) => (
+                <div key={i} className="flex gap-2 opacity-80 py-0.5">
+                  <span className={colorClass}>→</span>
+                  <span className="leading-relaxed">{route}</span>
+                </div>
+              ))}
+            />
+          )}
+
+          {state.analysis.architecture.interfacePatterns && state.analysis.architecture.interfacePatterns.length > 0 && (
+            <TerminalDisplay
+              accent={accent}
+              title="Interface Patterns"
+              items={state.analysis.architecture.interfacePatterns.map((pattern, i) => (
+                <div key={i} className="flex gap-2 opacity-80 py-0.5">
+                  <span className={colorClass}>⚡</span>
+                  <span className="leading-relaxed">{pattern}</span>
+                </div>
+              ))}
+            />
+          )}
+
           {state.analysis.warnings.length > 0 && (
             <div className="bg-red-950/20 border border-red-500/30 p-4 rounded-lg">
               <h4 className="text-red-400 text-xs font-bold uppercase font-mono mb-2">Compatibility Warnings</h4>

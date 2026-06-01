@@ -5,7 +5,7 @@ import {
   FuseGamesBody,
   DownloadFusedGameBody,
 } from "@workspace/api-zod";
-import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
+import { fetchRepoTree, fetchFileContent, fetchFileBuffer, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
 import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
@@ -125,10 +125,10 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
     return;
   }
 
-  const { fusionResult, gameAName, gameBName } = parsed.data;
+  const { fusionResult, gameAName, gameBName, ownerA, branchA, assetsA } = parsed.data;
   const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
-  req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
+  req.log.info({ files: fusionResult.files.length, zipName, assetsA: assetsA?.length }, "Creating ZIP download");
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
@@ -140,14 +140,39 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
 
   archive.pipe(res);
 
+  // Add generated files
   for (const file of fusionResult.files) {
-    // Sanitize the file path to prevent directory traversal within the ZIP
-    // We want to ensure paths are relative and don't escape the archive root
     const sanitizedPath = path
       .normalize(file.path)
       .replace(/^(\.\.(\/|\\|$))+/, "")
       .replace(/^[\\\/]+/, "");
     archive.append(file.content, { name: sanitizedPath });
+  }
+
+  // Fetch and add original assets from Game A
+  if (ownerA && branchA && assetsA && assetsA.length > 0) {
+    const [owner, repo] = ownerA.split("/");
+    req.log.info({ owner, repo, branchA, count: assetsA.length }, "Fetching Game A assets for ZIP");
+
+    // Process in batches to avoid overwhelming the network or GitHub
+    const batchSize = 5;
+    for (let i = 0; i < assetsA.length; i += batchSize) {
+      const batch = assetsA.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (assetPath) => {
+        try {
+          const buffer = await fetchFileBuffer(owner, repo, branchA, assetPath);
+          if (buffer) {
+            const sanitizedAssetPath = path
+              .normalize(assetPath)
+              .replace(/^(\.\.(\/|\\|$))+/, "")
+              .replace(/^[\\\/]+/, "");
+            archive.append(buffer, { name: sanitizedAssetPath });
+          }
+        } catch (err) {
+          req.log.warn({ assetPath, error: err }, "Failed to fetch asset for ZIP");
+        }
+      }));
+    }
   }
 
   // Add a README with fusion summary

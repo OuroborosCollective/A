@@ -63,11 +63,15 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
   const handleDownload = async () => {
     if (!fusionResult || !gameA.data || !gameB.data) return;
     try {
+      const assetPaths = gameA.analysis?.architecture.assetFiles.map(f => f.path) || [];
       const blob = await downloadGame({
         data: {
           fusionResult,
           gameAName: gameA.data.repo,
-          gameBName: gameB.data.repo
+          gameBName: gameB.data.repo,
+          ownerA: `${gameA.data.owner}/${gameA.data.repo}`,
+          branchA: gameA.data.defaultBranch,
+          assetsA: assetPaths
         }
       });
       const url = window.URL.createObjectURL(blob);
