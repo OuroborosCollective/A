@@ -37,8 +37,21 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
 
     // Fetch up to MAX_FILES_TO_FETCH code files
     const MAX_FILES = 40;
-    const toFetch = prioritized.filter(f => isCodeFile(f.path)).slice(0, MAX_FILES);
-    const assetFiles = prioritized.filter(f => !isCodeFile(f.path));
+    const toFetch: typeof prioritized = [];
+    const assetEntries: Array<{ path: string; content: string | null; size: number; type: "file" }> = [];
+
+    for (const f of prioritized) {
+      if (f.isCode && toFetch.length < MAX_FILES) {
+        toFetch.push(f);
+      } else {
+        assetEntries.push({
+          path: f.path,
+          content: null,
+          size: f.size,
+          type: "file" as const
+        });
+      }
+    }
 
     req.log.info({ owner, repo, totalFiles, toFetch: toFetch.length }, "Fetching repo files");
 
@@ -48,13 +61,6 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
         return { path: f.path, content: content ?? null, size: f.size, type: "file" as const };
       })
     );
-
-    const assetEntries = assetFiles.map(f => ({
-      path: f.path,
-      content: null,
-      size: f.size,
-      type: "file" as const
-    }));
 
     const allFiles = [...filesWithContent, ...assetEntries];
 

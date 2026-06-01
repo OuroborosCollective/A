@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-30 - Optimized repository analysis and fetching with single-pass loops
+**Learning:** Consolidating multiple array operations (filter, map, some) into a single loop significantly reduces O(N) iterations and memory pressure from intermediate array allocations. Additionally, using `lastIndexOf` and `slice` for file extension extraction is more efficient than `split('.').pop()` as it avoids creating unnecessary arrays.
+**Action:** When processing large lists of objects (like repository file trees), prefer a single `for...of` loop for multiple categorizations and metadata extractions.

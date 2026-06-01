@@ -58,8 +58,33 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
-  const codeFiles = repoData.files.filter(f => f.content);
-  const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
+  // Optimization: Single-pass loop for summary, content map, and structure detection
+  const codeFiles: RepoFile[] = [];
+  const assetFiles: RepoFile[] = [];
+  const contentMap = new Map<string, string | null>();
+  let structureType = "flat";
+  let hasSrc = false;
+  let hasLib = false;
+  let hasDeepPackageJson = false;
+
+  for (const f of repoData.files) {
+    if (f.content) {
+      codeFiles.push(f);
+      contentMap.set(f.path, f.content);
+    } else if (f.type === "file") {
+      assetFiles.push(f);
+      contentMap.set(f.path, null);
+    }
+
+    // Structure detection heuristics
+    if (!hasSrc && f.path.startsWith("src/")) hasSrc = true;
+    if (!hasLib && f.path.startsWith("lib/")) hasLib = true;
+    if (!hasDeepPackageJson && f.path.includes("package.json") && f.path.split("/").length > 2) hasDeepPackageJson = true;
+  }
+
+  if (hasDeepPackageJson) structureType = "monorepo";
+  else if (hasSrc) structureType = "src-driven";
+  else if (hasLib) structureType = "node-flat";
 
   const fileSummary = codeFiles
     .slice(0, 30)
@@ -167,8 +192,6 @@ ${fileSummary || "No code files found"}`;
   const categorizedFiles = parsed.categorizedFiles || [];
 
   // Build file maps enriched with content
-  const contentMap = new Map(repoData.files.map(f => [f.path, f.content]));
-
   const visualFiles: FileCategory[] = [];
   const logicFiles: FileCategory[] = [];
   const assetCats: FileCategory[] = [];
@@ -215,12 +238,6 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
-    const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
-
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
       language: parsed.language || "unknown",

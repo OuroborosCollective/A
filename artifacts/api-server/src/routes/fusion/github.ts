@@ -89,22 +89,35 @@ export async function fetchFileContent(
 }
 
 export function isCodeFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return CODE_EXTENSIONS.has(ext);
 }
 
 export function isAssetFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return ASSET_EXTENSIONS.has(ext);
 }
 
-export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): Array<{ path: string; type: string; size: number }> {
+export interface ScoredFile {
+  path: string;
+  type: string;
+  size: number;
+  score: number;
+  isCode: boolean;
+}
+
+export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): ScoredFile[] {
   const scored = files
     .filter(f => f.type === "blob")
     .map(f => {
       let score = 0;
       const p = f.path.toLowerCase();
-      if (isCodeFile(f.path)) score += 10;
+      const isCode = isCodeFile(f.path);
+      if (isCode) score += 10;
 
       // Critical entry points and routing
       if (p.includes("main") || p.includes("game") || p.includes("index") || p.includes("app") || p.includes("route")) score += 7;
@@ -121,7 +134,7 @@ export function prioritizeFiles(files: Array<{ path: string; type: string; size:
       if (p.includes("src/") || !p.includes("/")) score += 2;
       if (p.endsWith("package.json") || p.endsWith("readme.md") || p.includes("config")) score += 3;
 
-      return { ...f, score };
+      return { ...f, score, isCode };
     })
     .sort((a, b) => b.score - a.score);
   return scored;
