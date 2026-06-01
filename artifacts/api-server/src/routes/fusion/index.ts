@@ -126,9 +126,32 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
   }
 
   const { fusionResult, gameAName, gameBName } = parsed.data;
-  const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
-  req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
+  // Security: Limit the number of files and total content size to prevent DoS
+  const MAX_FILES = 100;
+  const MAX_TOTAL_SIZE = 10 * 1024 * 1024; // 10MB
+
+  if (fusionResult.files.length > MAX_FILES) {
+    res.status(400).json({ error: `Too many files (limit: ${MAX_FILES})` });
+    return;
+  }
+
+  let totalSize = 0;
+  for (const file of fusionResult.files) {
+    totalSize += file.content.length;
+  }
+
+  if (totalSize > MAX_TOTAL_SIZE) {
+    res.status(400).json({ error: "Total content size exceeds limit (10MB)" });
+    return;
+  }
+
+  // Truncate names to prevent overly long filenames
+  const safeAName = gameAName.slice(0, 50);
+  const safeBName = gameBName.slice(0, 50);
+  const zipName = `fused-${safeAName}-x-${safeBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
+
+  req.log.info({ files: fusionResult.files.length, totalSize, zipName }, "Creating ZIP download");
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
@@ -141,13 +164,21 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
   archive.pipe(res);
 
   for (const file of fusionResult.files) {
-    // Sanitize the file path to prevent directory traversal within the ZIP
-    // We want to ensure paths are relative and don't escape the archive root
+    // Sanitize the file path to prevent directory traversal (Zip Slip)
+    // 1. Normalize the path (resolve '..' and '.')
+    // 2. Remove leading slashes and drive letters
+    // 3. Remove any remaining traversal segments
+    // 4. Ensure it doesn't resolve to something outside the intended structure
     const sanitizedPath = path
       .normalize(file.path)
-      .replace(/^(\.\.(\/|\\|$))+/, "")
-      .replace(/^[\\\/]+/, "");
-    archive.append(file.content, { name: sanitizedPath });
+      .replace(/^([a-zA-Z]:)?[\\\/]+/, "")
+      .split(/[\\\/]/)
+      .filter(part => part !== ".." && part !== ".")
+      .join("/");
+
+    if (sanitizedPath) {
+      archive.append(file.content, { name: sanitizedPath });
+    }
   }
 
   // Add a README with fusion summary

@@ -7,6 +7,10 @@ import { logger } from "./lib/logger";
 
 const app: Express = express();
 
+// Trust the first proxy in front of the app (e.g. Replit, Nginx, Heroku)
+// This is essential for accurate IP detection in rate limiting and logging.
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(
   pinoHttp({
