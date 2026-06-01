@@ -58,8 +58,19 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
-  const codeFiles = repoData.files.filter(f => f.content);
-  const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
+  // Optimization: Single-pass loop for filtering and building contentMap
+  const codeFiles: RepoFile[] = [];
+  const assetFiles: RepoFile[] = [];
+  const contentMap = new Map<string, string | null>();
+
+  for (const f of repoData.files) {
+    contentMap.set(f.path, f.content ?? null);
+    if (f.content) {
+      codeFiles.push(f);
+    } else if (f.type === "file") {
+      assetFiles.push(f);
+    }
+  }
 
   const fileSummary = codeFiles
     .slice(0, 30)
@@ -166,9 +177,6 @@ ${fileSummary || "No code files found"}`;
   const warnings: string[] = parsed.warnings || [];
   const categorizedFiles = parsed.categorizedFiles || [];
 
-  // Build file maps enriched with content
-  const contentMap = new Map(repoData.files.map(f => [f.path, f.content]));
-
   const visualFiles: FileCategory[] = [];
   const logicFiles: FileCategory[] = [];
   const assetCats: FileCategory[] = [];
@@ -215,11 +223,24 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
+    // Optimization: Single-pass loop to determine structureType
+    let hasMonorepo = false;
+    let hasSrc = false;
+    let hasLib = false;
+
+    for (const f of repoData.files) {
+      if (!hasMonorepo && f.path.includes("package.json") && f.path.split("/").length > 2) {
+        hasMonorepo = true;
+        break; // Monorepo is highest priority
+      }
+      if (!hasSrc && f.path.startsWith("src/")) hasSrc = true;
+      if (!hasLib && f.path.startsWith("lib/")) hasLib = true;
+    }
+
     let structureType = "flat";
-    const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    if (hasMonorepo) structureType = "monorepo";
+    else if (hasSrc) structureType = "src-driven";
+    else if (hasLib) structureType = "node-flat";
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,

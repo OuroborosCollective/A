@@ -5,7 +5,7 @@ import {
   FuseGamesBody,
   DownloadFusedGameBody,
 } from "@workspace/api-zod";
-import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
+import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, type ScoredFile } from "./github";
 import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
@@ -35,10 +35,21 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
     const prioritized = prioritizeFiles(tree);
     const totalFiles = prioritized.length;
 
-    // Fetch up to MAX_FILES_TO_FETCH code files
+    // Optimization: Use a single-pass loop to separate code and asset files
     const MAX_FILES = 40;
-    const toFetch = prioritized.filter(f => isCodeFile(f.path)).slice(0, MAX_FILES);
-    const assetFiles = prioritized.filter(f => !isCodeFile(f.path));
+    const toFetch: ScoredFile[] = [];
+    const otherFiles: ScoredFile[] = [];
+
+    for (const f of prioritized) {
+      if (f.isCode) {
+        if (toFetch.length < MAX_FILES) {
+          toFetch.push(f);
+        }
+        // Note: Code files beyond MAX_FILES are excluded to keep context window manageable
+      } else {
+        otherFiles.push(f);
+      }
+    }
 
     req.log.info({ owner, repo, totalFiles, toFetch: toFetch.length }, "Fetching repo files");
 
@@ -49,14 +60,14 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
       })
     );
 
-    const assetEntries = assetFiles.map(f => ({
+    const otherEntries = otherFiles.map(f => ({
       path: f.path,
       content: null,
       size: f.size,
       type: "file" as const
     }));
 
-    const allFiles = [...filesWithContent, ...assetEntries];
+    const allFiles = [...filesWithContent, ...otherEntries];
 
     res.json({
       owner,

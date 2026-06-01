@@ -16,6 +16,14 @@ const ASSET_EXTENSIONS = new Set([
   ".obj", ".gltf", ".glb", ".fbx"
 ]);
 
+export interface ScoredFile {
+  path: string;
+  type: string;
+  size: number;
+  score: number;
+  isCode: boolean;
+}
+
 export function parseGitHubUrl(url: string): { owner: string; repo: string } | null {
   try {
     const u = new URL(url.trim());
@@ -89,22 +97,32 @@ export async function fetchFileContent(
 }
 
 export function isCodeFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return CODE_EXTENSIONS.has(ext);
 }
 
 export function isAssetFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return ASSET_EXTENSIONS.has(ext);
 }
 
-export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): Array<{ path: string; type: string; size: number }> {
-  const scored = files
+export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): ScoredFile[] {
+  const scored: ScoredFile[] = files
     .filter(f => f.type === "blob")
     .map(f => {
       let score = 0;
       const p = f.path.toLowerCase();
-      if (isCodeFile(f.path)) score += 10;
+
+      // Optimization: extract extension once and reuse
+      const lastDot = p.lastIndexOf(".");
+      const ext = lastDot !== -1 ? p.slice(lastDot) : "";
+      const isCode = CODE_EXTENSIONS.has(ext);
+
+      if (isCode) score += 10;
 
       // Critical entry points and routing
       if (p.includes("main") || p.includes("game") || p.includes("index") || p.includes("app") || p.includes("route")) score += 7;
@@ -121,7 +139,7 @@ export function prioritizeFiles(files: Array<{ path: string; type: string; size:
       if (p.includes("src/") || !p.includes("/")) score += 2;
       if (p.endsWith("package.json") || p.endsWith("readme.md") || p.includes("config")) score += 3;
 
-      return { ...f, score };
+      return { ...f, score, isCode };
     })
     .sort((a, b) => b.score - a.score);
   return scored;

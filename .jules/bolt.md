@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2026-06-01 - Optimized repository processing with single-pass loops
+**Learning:** Processing large repository trees (>1000 files) with multiple functional array methods (.filter, .map, .some) creates significant overhead due to multiple iterations and temporary array allocations. Single-pass loops with pre-calculated flags are much more efficient.
+**Action:** Use 'for...of' loops to perform multiple classifications/extractions in one pass, and enrich data objects early in the pipeline (e.g., during prioritization) to avoid redundant computations (like extension checks) in downstream routes.
