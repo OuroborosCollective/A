@@ -61,13 +61,16 @@ export function FusionCenter({ gameA, gameB }: FusionCenterProps) {
   };
 
   const handleDownload = async () => {
-    if (!fusionResult || !gameA.data || !gameB.data) return;
+    if (!fusionResult || !gameA.data || !gameB.data || !gameA.analysis) return;
     try {
       const blob = await downloadGame({
         data: {
           fusionResult,
           gameAName: gameA.data.repo,
-          gameBName: gameB.data.repo
+          gameBName: gameB.data.repo,
+          ownerA: gameA.data.owner,
+          branchA: gameA.data.defaultBranch,
+          assetsA: gameA.analysis.architecture.assetFiles.map(a => a.path)
         }
       });
       const url = window.URL.createObjectURL(blob);

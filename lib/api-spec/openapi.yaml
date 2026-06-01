@@ -263,6 +263,16 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileCategory"
+        interfacePatterns:
+          type: array
+          items:
+            type: string
+          description: List of detected patterns where logic and graphics layers communicate
+        logicalRoutes:
+          type: array
+          items:
+            type: string
+          description: List of detected data flow routes in the game logic
       required:
         - summary
         - visualFiles
@@ -357,7 +367,17 @@ components:
           type: string
         gameBName:
           type: string
+        ownerA:
+          type: string
+        branchA:
+          type: string
+        assetsA:
+          type: array
+          items:
+            type: string
       required:
         - fusionResult
         - gameAName
         - gameBName
+        - ownerA
+        - branchA

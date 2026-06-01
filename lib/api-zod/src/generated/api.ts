@@ -104,6 +104,16 @@ export const AnalyzeRepoResponse = zod.object({
         content: zod.string().nullish(),
       }),
     ),
+    interfacePatterns: zod
+      .array(zod.string())
+      .describe(
+        "List of detected patterns where logic and graphics layers communicate",
+      )
+      .optional(),
+    logicalRoutes: zod
+      .array(zod.string())
+      .describe("List of detected data flow routes in the game logic")
+      .optional(),
   }),
   warnings: zod.array(zod.string()),
 });
@@ -183,6 +193,16 @@ export const FuseGamesBody = zod.object({
               content: zod.string().nullish(),
             }),
           ),
+          interfacePatterns: zod
+            .array(zod.string())
+            .describe(
+              "List of detected patterns where logic and graphics layers communicate",
+            )
+            .optional(),
+          logicalRoutes: zod
+            .array(zod.string())
+            .describe("List of detected data flow routes in the game logic")
+            .optional(),
         }),
         warnings: zod.array(zod.string()),
       }),
@@ -258,6 +278,16 @@ export const FuseGamesBody = zod.object({
               content: zod.string().nullish(),
             }),
           ),
+          interfacePatterns: zod
+            .array(zod.string())
+            .describe(
+              "List of detected patterns where logic and graphics layers communicate",
+            )
+            .optional(),
+          logicalRoutes: zod
+            .array(zod.string())
+            .describe("List of detected data flow routes in the game logic")
+            .optional(),
         }),
         warnings: zod.array(zod.string()),
       }),
@@ -303,4 +333,7 @@ export const DownloadFusedGameBody = zod.object({
   }),
   gameAName: zod.string(),
   gameBName: zod.string(),
+  ownerA: zod.string(),
+  branchA: zod.string(),
+  assetsA: zod.array(zod.string()).optional(),
 });

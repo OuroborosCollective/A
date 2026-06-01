@@ -220,6 +220,8 @@ ${fileSummary || "No code files found"}`;
     if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
     else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
     else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    else if (paths.some(p => p.includes("Assets/") || p.includes("ProjectSettings/"))) structureType = "unity";
+    else if (paths.some(p => p.includes("project.godot"))) structureType = "godot";
 
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,

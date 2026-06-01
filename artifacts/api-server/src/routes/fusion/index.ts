@@ -5,7 +5,7 @@ import {
   FuseGamesBody,
   DownloadFusedGameBody,
 } from "@workspace/api-zod";
-import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
+import { fetchRepoTree, fetchFileContent, fetchFileBuffer, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
 import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
@@ -125,7 +125,7 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
     return;
   }
 
-  const { fusionResult, gameAName, gameBName } = parsed.data;
+  const { fusionResult, gameAName, gameBName, ownerA, branchA, assetsA } = parsed.data;
   const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
   req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
@@ -148,6 +148,21 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
       .replace(/^(\.\.(\/|\\|$))+/, "")
       .replace(/^[\\\/]+/, "");
     archive.append(file.content, { name: sanitizedPath });
+  }
+
+  // Bundle Game A assets if provided
+  if (assetsA && assetsA.length > 0) {
+    req.log.info({ assetCount: assetsA.length }, "Bundling Game A assets");
+    await Promise.all(assetsA.map(async (assetPath) => {
+      const buffer = await fetchFileBuffer(ownerA, gameAName, branchA, assetPath);
+      if (buffer) {
+        const sanitizedAssetPath = path
+          .normalize(assetPath)
+          .replace(/^(\.\.(\/|\\|$))+/, "")
+          .replace(/^[\\\/]+/, "");
+        archive.append(buffer, { name: sanitizedAssetPath });
+      }
+    }));
   }
 
   // Add a README with fusion summary

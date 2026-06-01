@@ -95,6 +95,10 @@ export interface GameArchitecture {
   visualFiles: FileCategory[];
   logicFiles: FileCategory[];
   assetFiles: FileCategory[];
+  /** List of detected patterns where logic and graphics layers communicate */
+  interfacePatterns?: string[];
+  /** List of detected data flow routes in the game logic */
+  logicalRoutes?: string[];
 }
 
 export interface AnalysisResult {
@@ -144,4 +148,7 @@ export interface DownloadBody {
   fusionResult: FusionResult;
   gameAName: string;
   gameBName: string;
+  ownerA: string;
+  branchA: string;
+  assetsA?: string[];
 }

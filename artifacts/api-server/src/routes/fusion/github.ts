@@ -88,6 +88,23 @@ export async function fetchFileContent(
   }
 }
 
+export async function fetchFileBuffer(
+  owner: string,
+  repo: string,
+  branch: string,
+  filePath: string
+): Promise<Buffer | null> {
+  try {
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch {
+    return null;
+  }
+}
+
 export function isCodeFile(path: string): boolean {
   const ext = "." + path.split(".").pop()?.toLowerCase();
   return CODE_EXTENSIONS.has(ext);
