@@ -29,6 +29,23 @@ export function parseGitHubUrl(url: string): { owner: string; repo: string } | n
   }
 }
 
+export async function fetchFileBuffer(
+  owner: string,
+  repo: string,
+  branch: string,
+  filePath: string
+): Promise<Buffer | null> {
+  try {
+    const url = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${filePath}`;
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const arrayBuffer = await res.arrayBuffer();
+    return Buffer.from(arrayBuffer);
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchRepoTree(owner: string, repo: string): Promise<{
   defaultBranch: string;
   description: string | null;

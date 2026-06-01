@@ -125,10 +125,10 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
     return;
   }
 
-  const { fusionResult, gameAName, gameBName } = parsed.data;
+  const { fusionResult, gameAName, gameBName, ownerA, branchA, assetsA } = parsed.data;
   const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
-  req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
+  req.log.info({ files: fusionResult.files.length, zipName, assetsA: assetsA.length }, "Creating ZIP download");
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
@@ -140,6 +140,7 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
 
   archive.pipe(res);
 
+  // Add generated fusion files
   for (const file of fusionResult.files) {
     // Sanitize the file path to prevent directory traversal within the ZIP
     // We want to ensure paths are relative and don't escape the archive root
@@ -148,6 +149,31 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
       .replace(/^(\.\.(\/|\\|$))+/, "")
       .replace(/^[\\\/]+/, "");
     archive.append(file.content, { name: sanitizedPath });
+  }
+
+  // Fetch and add original assets from Game A for a complete local workflow
+  if (ownerA && branchA && assetsA && assetsA.length > 0) {
+    const { fetchFileBuffer } = await import("./github");
+
+    // Process assets in small batches to avoid overwhelming the server/rate limits
+    const batchSize = 5;
+    for (let i = 0; i < assetsA.length; i += batchSize) {
+      const batch = assetsA.slice(i, i + batchSize);
+      await Promise.all(batch.map(async (assetPath) => {
+        try {
+          const buffer = await fetchFileBuffer(ownerA, gameAName, branchA, assetPath);
+          if (buffer) {
+            const sanitizedAssetPath = path
+              .normalize(assetPath)
+              .replace(/^(\.\.(\/|\\|$))+/, "")
+              .replace(/^[\\\/]+/, "");
+            archive.append(buffer, { name: sanitizedAssetPath });
+          }
+        } catch (err) {
+          req.log.error({ assetPath, error: err }, "Failed to fetch asset for download");
+        }
+      }));
+    }
   }
 
   // Add a README with fusion summary

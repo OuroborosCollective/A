@@ -263,11 +263,21 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/FileCategory"
+        interfacePatterns:
+          type: array
+          items:
+            type: string
+        logicalRoutes:
+          type: array
+          items:
+            type: string
       required:
         - summary
         - visualFiles
         - logicFiles
         - assetFiles
+        - interfacePatterns
+        - logicalRoutes
 
     AnalysisResult:
       type: object
@@ -357,7 +367,18 @@ components:
           type: string
         gameBName:
           type: string
+        ownerA:
+          type: string
+        branchA:
+          type: string
+        assetsA:
+          type: array
+          items:
+            type: string
       required:
         - fusionResult
         - gameAName
         - gameBName
+        - ownerA
+        - branchA
+        - assetsA

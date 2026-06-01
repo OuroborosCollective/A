@@ -11,4 +11,7 @@ export interface DownloadBody {
   fusionResult: FusionResult;
   gameAName: string;
   gameBName: string;
+  ownerA: string;
+  branchA: string;
+  assetsA: string[];
 }
