@@ -58,15 +58,38 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
-  const codeFiles = repoData.files.filter(f => f.content);
-  const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
+  // Single-pass traversal to gather metadata and detect repository structure
+  const contentMap = new Map<string, string | null | undefined>();
+  const assetPaths: string[] = [];
+  const codeFileSummaries: string[] = [];
+  let codeFilesCount = 0;
 
-  const fileSummary = codeFiles
-    .slice(0, 30)
-    .map(f => `### ${f.path}\n${(f.content || "").slice(0, 3000)}`)
-    .join("\n\n---\n\n");
+  let isMonorepo = false;
+  let isSrcDriven = false;
+  let isNodeFlat = false;
 
-  const assetList = assetFiles.map(f => f.path).join("\n");
+  for (const f of repoData.files) {
+    const path = f.path;
+    contentMap.set(path, f.content);
+
+    // Heuristic structure detection
+    if (!isMonorepo && path.includes("package.json") && path.split("/").length > 2) isMonorepo = true;
+    if (!isSrcDriven && path.startsWith("src/")) isSrcDriven = true;
+    if (!isNodeFlat && path.startsWith("lib/")) isNodeFlat = true;
+
+    if (f.content) {
+      if (codeFilesCount < 30) {
+        codeFileSummaries.push(`### ${path}\n${f.content.slice(0, 3000)}`);
+        codeFilesCount++;
+      }
+    } else if (f.type === "file") {
+      assetPaths.push(path);
+    }
+  }
+
+  const fileSummary = codeFileSummaries.join("\n\n---\n\n");
+  const assetList = assetPaths.join("\n");
+  const structureType = isMonorepo ? "monorepo" : isSrcDriven ? "src-driven" : isNodeFlat ? "node-flat" : "flat";
 
   // Fetch relevant knowledge context
   let knowledgeContext = "";
@@ -167,8 +190,6 @@ ${fileSummary || "No code files found"}`;
   const categorizedFiles = parsed.categorizedFiles || [];
 
   // Build file maps enriched with content
-  const contentMap = new Map(repoData.files.map(f => [f.path, f.content]));
-
   const visualFiles: FileCategory[] = [];
   const logicFiles: FileCategory[] = [];
   const assetCats: FileCategory[] = [];
@@ -189,9 +210,9 @@ ${fileSummary || "No code files found"}`;
   // Add any remaining asset files not already categorized
   // Optimization: Use a Set for O(1) path lookups to improve performance from O(N*M) to O(N+M)
   const categorizedPaths = new Set(categorizedFiles.map(c => c.path));
-  for (const af of assetFiles) {
-    if (!categorizedPaths.has(af.path)) {
-      assetCats.push({ path: af.path, category: "asset", reason: "Binary asset file", content: null });
+  for (const ap of assetPaths) {
+    if (!categorizedPaths.has(ap)) {
+      assetCats.push({ path: ap, category: "asset", reason: "Binary asset file", content: null });
     }
   }
 
@@ -215,12 +236,6 @@ ${fileSummary || "No code files found"}`;
 
   // Save knowledge to Learning Matrix
   try {
-    let structureType = "flat";
-    const paths = repoData.files.map(f => f.path);
-    if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
-    else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
-    else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
-
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
       language: parsed.language || "unknown",

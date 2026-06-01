@@ -33,3 +33,13 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-30 - Optimized repository analysis with single-pass traversal
+
+**Learning:** Processing large repository trees (>1000 files) using multiple functional array methods like `.filter()`, `.map()`, and `.some()` is a performance anti-pattern. Each call triggers a full traversal and creates new intermediate arrays. A single `for...of` loop can gather all necessary metadata, detect structures, and prepare summaries in one pass.
+
+**Action:** Refactored `analyzeGameRepo` in `artifacts/api-server/src/routes/fusion/analyzer.ts` to use a single `for...of` loop for content mapping, structure detection (monorepo, src-driven, etc.), code file summarization, and asset listing.
+
+**Predicted Performance Impact:**
+- **Before:** O(7N) complexity with multiple intermediate array allocations. For a 5000-file repository, this meant ~35,000 operations across multiple passes.
+- **After:** O(N) complexity. The same repository now requires only 5,000 operations and significantly less memory overhead by avoiding redundant traversals and array copies.
