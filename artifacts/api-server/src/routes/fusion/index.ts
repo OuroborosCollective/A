@@ -32,13 +32,13 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
   try {
     const { defaultBranch, description, tree } = await fetchRepoTree(owner, repo);
 
-    const prioritized = prioritizeFiles(tree);
-    const totalFiles = prioritized.length;
+    const { codeFiles, assetFiles } = prioritizeFiles(tree);
+    const totalFiles = codeFiles.length + assetFiles.length;
 
     // Fetch up to MAX_FILES_TO_FETCH code files
     const MAX_FILES = 40;
-    const toFetch = prioritized.filter(f => isCodeFile(f.path)).slice(0, MAX_FILES);
-    const assetFiles = prioritized.filter(f => !isCodeFile(f.path));
+    // Optimization: codeFiles is already sorted by priority in prioritizeFiles
+    const toFetch = codeFiles.slice(0, MAX_FILES);
 
     req.log.info({ owner, repo, totalFiles, toFetch: toFetch.length }, "Fetching repo files");
 

@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2025-05-16 - Optimized repository tree prioritization
+**Learning:** Sorting an entire repository tree (which can have >10k files) using multiple high-level array methods (.filter, .map, .sort) is a major bottleneck. Separating files into categories in a single O(N) pass and only sorting the small subset of relevant files (code) reduces complexity from O(N log N) to O(N + C log C).
+**Action:** Refactored `prioritizeFiles` in `github.ts` to use a single loop for categorization/scoring and only sort the code files array.

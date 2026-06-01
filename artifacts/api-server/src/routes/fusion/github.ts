@@ -89,40 +89,68 @@ export async function fetchFileContent(
 }
 
 export function isCodeFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return CODE_EXTENSIONS.has(ext);
 }
 
 export function isAssetFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
+  const lastDot = path.lastIndexOf(".");
+  if (lastDot === -1) return false;
+  const ext = path.slice(lastDot).toLowerCase();
   return ASSET_EXTENSIONS.has(ext);
 }
 
-export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): Array<{ path: string; type: string; size: number }> {
-  const scored = files
-    .filter(f => f.type === "blob")
-    .map(f => {
-      let score = 0;
+export interface ScoredFile {
+  path: string;
+  type: string;
+  size: number;
+  score: number;
+  isCode: boolean;
+}
+
+export interface RepoFile {
+  path: string;
+  type: string;
+  size: number;
+}
+
+export function prioritizeFiles(files: RepoFile[]): { codeFiles: ScoredFile[], assetFiles: RepoFile[] } {
+  const codeFiles: ScoredFile[] = [];
+  const assetFiles: RepoFile[] = [];
+
+  // Optimization: Single pass to categorize and score.
+  // Using a single loop avoids multiple filter/map passes.
+  for (const f of files) {
+    if (f.type !== "blob") continue;
+
+    const isCode = isCodeFile(f.path);
+    if (isCode) {
+      let score = 10;
       const p = f.path.toLowerCase();
-      if (isCodeFile(f.path)) score += 10;
 
       // Critical entry points and routing
       if (p.includes("main") || p.includes("game") || p.includes("index") || p.includes("app") || p.includes("route")) score += 7;
-
       // Logical structures and data management
       if (p.includes("player") || p.includes("enemy") || p.includes("ai") || p.includes("physics") || p.includes("collision")) score += 5;
       if (p.includes("state") || p.includes("store") || p.includes("schema") || p.includes("db") || p.includes("model")) score += 5;
-
       // Graphical and world layout
       if (p.includes("world") || p.includes("level") || p.includes("map") || p.includes("tile")) score += 4;
       if (p.includes("render") || p.includes("scene") || p.includes("canvas") || p.includes("sprite") || p.includes("draw")) score += 4;
-
       // Project structure
       if (p.includes("src/") || !p.includes("/")) score += 2;
       if (p.endsWith("package.json") || p.endsWith("readme.md") || p.includes("config")) score += 3;
 
-      return { ...f, score };
-    })
-    .sort((a, b) => b.score - a.score);
-  return scored;
+      codeFiles.push({ ...f, score, isCode: true });
+    } else {
+      assetFiles.push(f);
+    }
+  }
+
+  // Optimization: Sort only the code files (usually <1% of the tree).
+  // Leaving assetFiles unsorted reduces complexity from O(N log N) to O(N + C log C).
+  codeFiles.sort((a, b) => b.score - a.score);
+
+  return { codeFiles, assetFiles };
 }
