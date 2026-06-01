@@ -1,3 +1,3 @@
-## 2025-05-15 - [Accessibility & Clarity Polish]
-**Learning:** In a complex, theme-heavy interface (like "Cyber" or "Futuristic" styles), semantic elements and explicit ARIA labels are often overlooked in favor of aesthetics. Explicitly associating labels with inputs and providing aria-labels for icon-only or loading states is critical for maintaining accessibility without compromising the visual style.
-**Action:** Always ensure unique IDs are generated for form fields in reusable components (e.g., using a `role` or `id` prop) and provide descriptive `aria-label` content for buttons that transition between icon and text states.
+## 2025-05-22 - Semantic Terminal Lists
+**Learning:** Using semantic HTML like `<ul>` and `<li>` instead of generic `<div>`s for list-like data (such as file lists in a terminal component) significantly improves accessibility for screen readers without altering the visual design when combined with utility classes like `list-none`.
+**Action:** Always evaluate if a repetitive set of elements represents a list and use semantic tags where appropriate.
