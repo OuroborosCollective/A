@@ -94,7 +94,8 @@ router.post("/fusion/analyze", async (req, res): Promise<void> => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     req.log.error({ error: message }, "Analysis failed");
-    res.status(500).json({ error: message });
+    // Don't leak internal error details on 500
+    res.status(500).json({ error: "An unexpected error occurred during analysis." });
   }
 });
 
@@ -114,7 +115,8 @@ router.post("/fusion/fuse", async (req, res): Promise<void> => {
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : "Unknown error";
     req.log.error({ error: message }, "Fusion failed");
-    res.status(500).json({ error: message });
+    // Don't leak internal error details on 500
+    res.status(500).json({ error: "An unexpected error occurred during game fusion." });
   }
 });
 
