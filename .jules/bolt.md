@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2026-06-02 - Optimized tree processing with single-pass loops
+**Learning:** Processing large repository trees using multiple functional array methods (filter, map, sort) causes redundant iterations and increases GC pressure. Using a single `for...of` loop to partition data and pre-calculate metadata (like file type) significantly improves performance. Additionally, `path.lastIndexOf('.')` with `slice()` is ~10% faster than `path.split('.').pop()` for extension extraction.
+**Action:** Prefer single-pass loops for tree traversal and avoid unnecessary array allocations in hot paths.
