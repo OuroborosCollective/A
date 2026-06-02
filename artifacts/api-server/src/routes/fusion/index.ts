@@ -33,14 +33,26 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
     const { defaultBranch, description, tree } = await fetchRepoTree(owner, repo);
 
     const prioritized = prioritizeFiles(tree);
-    const totalFiles = prioritized.length;
+    const totalFilesCount = prioritized.length;
 
     // Fetch up to MAX_FILES_TO_FETCH code files
+    // Use a single loop to partition files to optimize O(N) traversal
     const MAX_FILES = 40;
-    const toFetch = prioritized.filter(f => isCodeFile(f.path)).slice(0, MAX_FILES);
-    const assetFiles = prioritized.filter(f => !isCodeFile(f.path));
+    const toFetch: typeof prioritized = [];
+    const metaOnly: typeof prioritized = [];
 
-    req.log.info({ owner, repo, totalFiles, toFetch: toFetch.length }, "Fetching repo files");
+    for (const f of prioritized) {
+      if (f.isCode) {
+        if (toFetch.length < MAX_FILES) {
+          toFetch.push(f);
+        }
+        // Else: Discard code files exceeding the fetch limit to maintain original behavior
+      } else {
+        metaOnly.push(f);
+      }
+    }
+
+    req.log.info({ owner, repo, totalFilesCount, toFetch: toFetch.length }, "Fetching repo files");
 
     const filesWithContent = await Promise.all(
       toFetch.map(async (f) => {
@@ -49,14 +61,14 @@ router.post("/fusion/fetch-repo", async (req, res): Promise<void> => {
       })
     );
 
-    const assetEntries = assetFiles.map(f => ({
+    const metaEntries = metaOnly.map(f => ({
       path: f.path,
       content: null,
       size: f.size,
       type: "file" as const
     }));
 
-    const allFiles = [...filesWithContent, ...assetEntries];
+    const allFiles = [...filesWithContent, ...metaEntries];
 
     res.json({
       owner,

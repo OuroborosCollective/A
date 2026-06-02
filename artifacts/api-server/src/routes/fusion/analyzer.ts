@@ -58,8 +58,16 @@ export async function analyzeGameRepo(
     console.error("Learning matrix lookup failed:", err);
   }
 
-  const codeFiles = repoData.files.filter(f => f.content);
-  const assetFiles = repoData.files.filter(f => !f.content && f.type === "file");
+  // Optimization: Single-pass loop to partition files instead of multiple .filter() calls
+  const codeFiles: RepoFile[] = [];
+  const assetFiles: RepoFile[] = [];
+  for (const f of repoData.files) {
+    if (f.content) {
+      codeFiles.push(f);
+    } else if (f.type === "file") {
+      assetFiles.push(f);
+    }
+  }
 
   const fileSummary = codeFiles
     .slice(0, 30)

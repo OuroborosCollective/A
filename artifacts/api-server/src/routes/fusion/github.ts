@@ -88,23 +88,39 @@ export async function fetchFileContent(
   }
 }
 
+export interface ScoredFile {
+  path: string;
+  type: string;
+  size: number;
+  score: number;
+  isCode: boolean;
+}
+
+/**
+ * Optimized extension extraction that avoids array allocation from split()
+ */
+function getExtension(path: string): string {
+  const lastDot = path.lastIndexOf(".");
+  return lastDot !== -1 ? path.slice(lastDot).toLowerCase() : "";
+}
+
 export function isCodeFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
-  return CODE_EXTENSIONS.has(ext);
+  return CODE_EXTENSIONS.has(getExtension(path));
 }
 
 export function isAssetFile(path: string): boolean {
-  const ext = "." + path.split(".").pop()?.toLowerCase();
-  return ASSET_EXTENSIONS.has(ext);
+  return ASSET_EXTENSIONS.has(getExtension(path));
 }
 
-export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): Array<{ path: string; type: string; size: number }> {
+export function prioritizeFiles(files: Array<{ path: string; type: string; size: number }>): ScoredFile[] {
   const scored = files
     .filter(f => f.type === "blob")
     .map(f => {
       let score = 0;
       const p = f.path.toLowerCase();
-      if (isCodeFile(f.path)) score += 10;
+      const isCode = isCodeFile(f.path);
+
+      if (isCode) score += 10;
 
       // Critical entry points and routing
       if (p.includes("main") || p.includes("game") || p.includes("index") || p.includes("app") || p.includes("route")) score += 7;
@@ -121,7 +137,7 @@ export function prioritizeFiles(files: Array<{ path: string; type: string; size:
       if (p.includes("src/") || !p.includes("/")) score += 2;
       if (p.endsWith("package.json") || p.endsWith("readme.md") || p.includes("config")) score += 3;
 
-      return { ...f, score };
+      return { ...f, score, isCode };
     })
     .sort((a, b) => b.score - a.score);
   return scored;
