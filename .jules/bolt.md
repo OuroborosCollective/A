@@ -33,3 +33,7 @@ EXPLAIN SELECT * FROM messages WHERE conversation_id = 123;
 **Predicted Performance Impact:**
 - **Before:** O(N * M) where N is the number of asset files and M is the number of categorized files. For a repo with 1000 assets and 100 categorized files, this could take ~100,000 comparisons.
 - **After:** O(N + M) complexity. The same scenario would only take ~1,100 operations. Benchmarks showed a reduction from ~36ms to ~8ms for 10,000 assets.
+
+## 2026-06-02 - Optimized repo tree traversal and extension checks
+**Learning:** Using `path.lastIndexOf('.')` and `path.slice()` for file extension extraction is significantly faster than `path.split('.').pop()` because it avoids unnecessary array allocations. Combining multiple `.filter()` and `.map()` passes into a single `for...of` loop further reduces overhead when processing large repository trees.
+**Action:** Applied these patterns in the GitHub utility and fusion analysis route to improve response times for repository fetching.
