@@ -357,6 +357,14 @@ components:
           type: string
         gameBName:
           type: string
+        ownerA:
+          type: string
+        branchA:
+          type: string
+        assetsA:
+          type: array
+          items:
+            type: string
       required:
         - fusionResult
         - gameAName

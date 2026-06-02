@@ -303,4 +303,7 @@ export const DownloadFusedGameBody = zod.object({
   }),
   gameAName: zod.string(),
   gameBName: zod.string(),
+  ownerA: zod.string().optional(),
+  branchA: zod.string().optional(),
+  assetsA: zod.array(zod.string()).optional(),
 });

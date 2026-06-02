@@ -93,21 +93,23 @@ export async function fuseGames(gameA: GameInput, gameB: GameInput): Promise<Fus
   const systemPrompt = `You are an expert game developer who specializes in merging and remixing games.
 
 Your task is to create a NEW hybrid game by:
-1. Taking the VISUAL LAYER (graphical overlay, world, level design, rendering, sprites) from Game A
-2. Taking the LOGIC LAYER (logical data structures, player mechanics, physics, collision, AI, scoring, game loop) from Game B
+1. Taking the GRAPHICAL OVERLAY (visual layer, world, level design, rendering, sprites) from Game A
+2. Taking the LOGICAL DATA STRUCTURE (logic layer, game state, mechanics, physics, collision, AI, scoring, game loop) from Game B
 3. Combining them into a single working HTML5 web game
 
 The output MUST be:
 - A self-contained HTML5 game that runs in a browser (index.html + any supporting JS/CSS files)
 - Fully functional with the visual world of Game A and the gameplay mechanics of Game B
 - Written in clean, modern JavaScript
-- No external dependencies that aren't available via CDN (if needed, use CDN links)
+- No external dependencies that aren't available via CDN (if needed, use CDN links).
+- All scripts must be self-contained or use stable CDNs to ensure a robust local workflow.
 
 You MUST adapt and bridge the code:
-- Wire Game A's visual elements to Game B's game loop
-- Replace Game B's rendering calls with Game A's graphics/assets/visual style
-- Ensure asset paths reference the actual assets from Game A (use relative paths)
-- Handle the case where the rendering engines differ by adapting the approach
+- Wire Game A's Graphical Overlay to Game B's Logical Data Structure.
+- Connect the logical routes of Game B to the interface patterns of Game A.
+- Replace Game B's rendering calls with Game A's graphics/assets/visual style.
+- Ensure asset paths reference the actual assets from Game A using relative paths (e.g., 'assets/player.png').
+- Handle rendering engine differences by adapting the logic layer to use the visual layer's API.
 
 Return ONLY valid JSON with this structure:
 {

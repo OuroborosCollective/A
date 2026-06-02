@@ -92,14 +92,16 @@ export async function analyzeGameRepo(
   }
 
   const systemPrompt = `You are an expert game developer analyzing a GitHub game repository. 
-Your task is to analyze the source code and strictly classify files into layers to distinguish between "Logical Data Structure" and "Graphical Overlay":
-- visual (Graphical Overlay): Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
-- logic (Logical Core): Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
-- asset: Images, audio, fonts, 3D models, sprite sheets.
-- config: package.json, config files, build scripts.
-- other: tests, documentation, utilities.
+Your task is to analyze the source code and strictly classify files into layers to clearly distinguish between "Logical Data Structure" and "Graphical Overlay":
+- visual (Graphical Overlay): This layer handles the presentation. Rendering code, canvas/WebGL drawing, scene graph setup, world/level layout, UI/HUD, sprites rendering, and animations.
+- logic (Logical Data Structure): This layer handles the core game state and rules. Logical data structures, game mechanics, state management, physics, collision math, enemy behavior (AI), input processing, and scoring.
+- asset: Static binary files like images, audio, fonts, 3D models, sprite sheets.
+- config: Project configuration like package.json, tsconfig, build scripts.
+- other: Non-essential files like tests, documentation, or generic utilities.
 
-Crucially, identify the "Logical Routes" - the core paths of data flow and state updates, and "Interfaces" where the logic layer tells the visual layer what to draw.
+Crucially, identify:
+1. "Logical Routes": The core paths of data flow, state updates, and event propagation within the logic layer.
+2. "Interface Patterns": The API hooks, event listeners, or function calls where the Logical Data Structure communicates with the Graphical Overlay to trigger visual updates.
 
 You must also detect:
 - The primary programming language (e.g., "typescript", "javascript", "python", "lua")
@@ -213,14 +215,17 @@ ${fileSummary || "No code files found"}`;
     warnings,
   };
 
-  // Save knowledge to Learning Matrix
+  // Save knowledge to Learning Matrix and Knowledge base
   try {
     let structureType = "flat";
     const paths = repoData.files.map(f => f.path);
     if (paths.some(p => p.includes("package.json") && p.split("/").length > 2)) structureType = "monorepo";
     else if (paths.some(p => p.startsWith("src/"))) structureType = "src-driven";
     else if (paths.some(p => p.startsWith("lib/"))) structureType = "node-flat";
+    else if (paths.some(p => p.includes("Assets/") || p.includes("ProjectSettings/"))) structureType = "unity";
+    else if (paths.some(p => p.endsWith("project.godot"))) structureType = "godot";
 
+    // Update Learning Matrix (per-repo cache)
     await db.insert(learningMatrix).values({
       repoIdentifier: repoId,
       language: parsed.language || "unknown",
@@ -239,8 +244,41 @@ ${fileSummary || "No code files found"}`;
         updatedAt: new Date(),
       }
     });
+
+    // Extract and save generalized architectural knowledge
+    if (result.architecture.interfacePatterns?.length || result.architecture.logicalRoutes?.length) {
+      const category = "architecture";
+      const subCategory = result.architecture.renderingEngine || "general";
+      const key = `${subCategory}_${structureType}_pattern`;
+
+      await db.insert(knowledge).values({
+        category,
+        subCategory,
+        key,
+        content: {
+          structureType,
+          interfacePatterns: result.architecture.interfacePatterns,
+          logicalRoutes: result.architecture.logicalRoutes,
+          language: parsed.language,
+        },
+        tags: [parsed.language || "unknown", structureType, result.architecture.gameGenre || "unknown"],
+        confidence: 80,
+      }).onConflictDoUpdate({
+        target: knowledge.key,
+        set: {
+          content: {
+            structureType,
+            interfacePatterns: result.architecture.interfacePatterns,
+            logicalRoutes: result.architecture.logicalRoutes,
+            language: parsed.language,
+          },
+          confidence: 85,
+          updatedAt: new Date(),
+        }
+      });
+    }
   } catch (err) {
-    console.error("Failed to save to learning matrix:", err);
+    console.error("Failed to save knowledge:", err);
   }
 
   return result;

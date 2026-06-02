@@ -5,7 +5,14 @@ import {
   FuseGamesBody,
   DownloadFusedGameBody,
 } from "@workspace/api-zod";
-import { fetchRepoTree, fetchFileContent, parseGitHubUrl, prioritizeFiles, isCodeFile } from "./github";
+import {
+  fetchRepoTree,
+  fetchFileContent,
+  fetchFileBuffer,
+  parseGitHubUrl,
+  prioritizeFiles,
+  isCodeFile,
+} from "./github";
 import { analyzeGameRepo } from "./analyzer";
 import { fuseGames } from "./fusionEngine";
 import archiver from "archiver";
@@ -125,10 +132,17 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
     return;
   }
 
-  const { fusionResult, gameAName, gameBName } = parsed.data;
+  const { fusionResult, gameAName, gameBName, ownerA, branchA, assetsA } = parsed.data;
   const zipName = `fused-${gameAName}-x-${gameBName}.zip`.replace(/[^a-zA-Z0-9\-_.]/g, "_");
 
-  req.log.info({ files: fusionResult.files.length, zipName }, "Creating ZIP download");
+  req.log.info(
+    {
+      files: fusionResult.files.length,
+      zipName,
+      hasAssetsA: !!assetsA?.length,
+    },
+    "Creating ZIP download",
+  );
 
   res.setHeader("Content-Type", "application/zip");
   res.setHeader("Content-Disposition", `attachment; filename="${zipName}"`);
@@ -139,6 +153,27 @@ router.post("/fusion/download", async (req, res): Promise<void> => {
   });
 
   archive.pipe(res);
+
+  // Fetch and include original binary assets from Game A
+  if (ownerA && branchA && assetsA?.length) {
+    req.log.info({ ownerA, branchA, assetCount: assetsA.length }, "Fetching binary assets for ZIP");
+    const assetResults = await Promise.all(
+      assetsA.map(async (assetPath) => {
+        const buffer = await fetchFileBuffer(ownerA, gameAName, branchA, assetPath);
+        return { path: assetPath, buffer };
+      }),
+    );
+
+    for (const asset of assetResults) {
+      if (asset.buffer) {
+        const sanitizedPath = path
+          .normalize(asset.path)
+          .replace(/^(\.\.(\/|\\|$))+/, "")
+          .replace(/^[\\\/]+/, "");
+        archive.append(asset.buffer, { name: sanitizedPath });
+      }
+    }
+  }
 
   for (const file of fusionResult.files) {
     // Sanitize the file path to prevent directory traversal within the ZIP
