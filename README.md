@@ -1,96 +1,84 @@
-# Game Fusion Dock
+# Satoshi Nakamoto & Bitcoin Research Worker
 
-Game Fusion Dock is an AI-powered platform designed to hybridize web games. By analyzing the source code of two different games, it can extract the **visual layer** from one and the **logic layer** from another, synthesizing them into a new, functional hybrid game.
+Evidence-first Notion Worker für fortlaufende, autonome Recherche zu Satoshi Nakamoto, der Bitcoin-Entstehung, Bitcoin Core und dem aktuellen BTC-Hype.
 
-## 🚀 Key Features
+## Was dieses Repository tut
 
-- **Repository Analysis**: Automatically analyzes GitHub repositories to identify game architectures, rendering engines, and key source files.
-- **AI-Powered Fusion**: Uses advanced LLMs to bridge disparate codebases, wiring visual components to game logic.
-- **Instant Synthesis**: Real-time generation of hybrid source code with compatibility scoring and compiler warnings.
-- **Archive Export**: Download the synthesized hybrid game as a ready-to-run ZIP archive.
-- **Cyber-Punk UI**: An immersive, high-performance interface built with React, Tailwind CSS, and Framer Motion.
+- synchronisiert aktuelle Bitcoin-Core-Commits und Releases in ein verwaltetes Notion-Quellenarchiv;
+- stellt einen manuellen, paginierten Vollhistorien-Backfill bereit;
+- inventarisiert frühe Bitcoin.org-, Whitepaper- und SourceForge-Captures über die Internet Archive CDX API;
+- sammelt technische und mediale RSS-/Atom-Signale in einer getrennten Hype-Datenbank;
+- erzeugt kanonische URLs, deterministische IDs und SHA-256-Hashes normalisierter Datensätze;
+- bietet read-only Agent-Tools für Recherchepfade, Evidenzeinstufung, Hype-Berechnung und Canonical IDs;
+- trennt Primärevidenz, Archivkopien, Medienberichte und Aufmerksamkeit strikt voneinander.
 
-## 🛠️ Tech Stack
+## Wahrheitsregel
 
-### Frontend
-- **React 19** & **Vite**
-- **Tailwind CSS** (v4)
-- **Framer Motion** for animations
-- **Radix UI** for accessible components
-- **TanStack Query** (React Query) for state management
+Ein Feed-Eintrag, Medienbericht, Archivcapture oder hoher Hype-Wert beweist keine Identität. Keine Person darf als Satoshi Nakamoto klassifiziert werden, solange keine unabhängig reproduzierbare kryptografische Evidenz vorliegt.
 
-### Backend
-- **Express 5**
-- **TypeScript**
-- **OpenAI Integration** for the Fusion Engine
-- **Drizzle ORM** with **PostgreSQL**
-- **Zod** for schema validation
+`Record SHA-256` belegt den normalisierten Metadatensatz. Er ist kein Hash des vollständigen Originaldokuments, solange `Content-Hash verifiziert` nicht ausdrücklich gesetzt ist.
 
-### Tooling & Monorepo
-- **pnpm workspaces** for monorepo management
-- **Orval** for OpenAPI client & schema generation
-- **esbuild** for high-speed builds
+## Voraussetzungen
 
-## 📂 Project Structure
+- Node.js 22 oder neuer
+- npm 10 oder neuer
+- Notion CLI `ntn`
+
+Die aktuelle Notion-Workers-Dokumentation verlangt Node.js 22+ und einen Worker, der genau eine `Worker`-Instanz exportiert.
+
+## Lokal prüfen
+
+```bash
+npm install
+npm run verify
+```
+
+## In Notion deployen
+
+```bash
+curl -fsSL https://ntn.dev | bash
+ntn login
+ntn workers deploy --name satoshi-research
+```
+
+Optional kann ein GitHub-Token als Worker-Secret gesetzt werden, um das öffentliche API-Limit anzuheben. Ohne Token bleibt die Lane bewusst auf 50 Requests pro Stunde begrenzt.
+
+```bash
+ntn workers secrets set GITHUB_TOKEN
+```
+
+## Automatische Datenbanken
+
+Beim Deployment erzeugt der Worker:
+
+1. **Satoshi & Bitcoin – Quellenarchiv**
+2. **Bitcoin – Hype- und Aufmerksamkeitssignale**
+
+Schemaänderungen an managed databases werden beim Deployment migriert und können Daten entfernen. Änderungen an `src/schemas.ts` deshalb stets als migrationskritisch behandeln.
+
+## Agent-Tools
+
+- `deriveResearchPaths`
+- `assessEvidence`
+- `calculateHype`
+- `canonicalSourceId`
+
+Alle vier Tools sind read-only markiert.
+
+## Struktur
 
 ```text
-├── artifacts/              # Deployable applications
-│   ├── api-server/         # Express API server
-│   ├── game-fusion/        # Game Fusion Dock frontend (React+Vite)
-│   └── mockup-sandbox/     # Component development sandbox
-├── lib/                    # Shared libraries
-│   ├── api-spec/           # OpenAPI 3.1 specification & codegen config
-│   ├── api-client-react/   # Generated React Query hooks
-│   ├── api-zod/            # Generated Zod schemas
-│   ├── db/                 # Database schema and Drizzle client
-│   └── integrations-*/     # Shared integrations (OpenAI, etc.)
-├── scripts/                # Development utility scripts
-├── package.json            # Workspace root configuration
-└── pnpm-workspace.yaml     # Workspace definition
+src/
+  adapters/       externe, typisierte Datenquellen
+  domain/         Canonical IDs, Hashing, Evidenz- und Hype-Logik
+  config.ts       öffentliches Quellenregister
+  schemas.ts      Notion-managed Databases und Projektionen
+  sync.ts         paginierte, idempotente Sync-Lanes
+  tools.ts        read-only Notion Agent Tools
+  index.ts        Worker-Manifest
+docs/             Architektur, Evidenzmodell und Quellenregister
 ```
 
-## 🚥 Getting Started
+## Noch nicht als belegt behauptet
 
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v24 recommended)
-- [pnpm](https://pnpm.io/)
-
-### Installation
-
-```bash
-pnpm install
-```
-
-### Running the Apps
-
-To start the API server:
-```bash
-pnpm --filter @workspace/api-server run dev
-```
-
-To start the Game Fusion frontend:
-```bash
-pnpm --filter @workspace/game-fusion run dev
-```
-
-## 🏗️ Development Workflow
-
-### Typechecking
-Always run typecheck from the root to ensure cross-package references are resolved:
-```bash
-pnpm run typecheck
-```
-
-### API Code Generation
-If the OpenAPI spec in `lib/api-spec/openapi.yaml` changes, regenerate the clients:
-```bash
-pnpm --filter @workspace/api-spec run codegen
-```
-
-### Building for Production
-```bash
-pnpm run build
-```
-
-## 📜 License
-MIT
+Der Branch deployt den Worker nicht automatisch. Notion-Deployment, erzeugte Datenbanken, Live-Syncs und Readback-Parität gelten erst nach einem echten `ntn workers deploy`, einem ausgeführten Sync und erneutem Notion-Abruf als Runtime-Evidence.
