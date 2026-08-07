@@ -1,3 +1,5 @@
+import type { WikipediaSeed } from "./adapters/wikipedia.js"
+
 export interface FeedDefinition {
   id: string
   title: string
@@ -33,8 +35,49 @@ export const WAYBACK_SEEDS = [
   "http://www.bitcoin.org/bitcoin.pdf",
   "http://www.bitcoin.org/",
   "http://bitcoin.sourceforge.net/",
+  "https://sourceforge.net/projects/bitcoin/",
+  "https://sourceforge.net/p/bitcoin/news/",
+  "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
+  "https://sourceforge.net/p/bitcoin/code/HEAD/tree/",
   BITCOINTALK.historicalProfileUrl,
   BITCOINTALK.historicalPostsUrl,
+] as const
+
+export const SOURCEFORGE_SEEDS = [
+  "https://sourceforge.net/projects/bitcoin/",
+  "https://sourceforge.net/p/bitcoin/news/",
+  "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
+  "https://sourceforge.net/p/bitcoin/news/2011/01/development-process/",
+  "https://sourceforge.net/p/bitcoin/code/HEAD/tree/",
+  "https://sourceforge.net/projects/bitcoin/files/",
+] as const
+
+export const WIKIPEDIA_SEEDS: WikipediaSeed[] = [
+  { language: "en", title: "Bitcoin" },
+  { language: "en", title: "Satoshi Nakamoto" },
+  { language: "de", title: "Bitcoin" },
+  { language: "de", title: "Satoshi Nakamoto" },
+]
+
+export const COMMON_CRAWL_COLLECTIONS = [
+  "CC-MAIN-2008-2009",
+  "CC-MAIN-2009-2010",
+  "CC-MAIN-2012",
+] as const
+
+export const COMMON_CRAWL_SEEDS = [
+  "bitcoin.org/*",
+  "www.bitcoin.org/*",
+  "bitcoin.sourceforge.net/*",
+  "sourceforge.net/p/bitcoin/*",
+  "sourceforge.net/projects/bitcoin/*",
+] as const
+
+export const HISTORICAL_DISCOVERY_PROVIDERS = [
+  "wayback",
+  "sourceforge",
+  "wikipedia",
+  "commoncrawl",
 ] as const
 
 export const FEEDS: FeedDefinition[] = [
