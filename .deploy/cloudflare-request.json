@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "mode": "live",
-  "base_sha": "b9fd4a6a4f1cc9c3416e8bcb705ee7e73a9f0dda",
-  "reason": "First live free-runtime evidence run after successful preview, with Notion pacing, Retry-After handling and bounded commit batch"
+  "base_sha": "6cb98936353516993c4e6422c67b047ec218182a",
+  "evidence_lane": "wikipedia",
+  "reason": "Restore exact final historical-source revision to live mode and prove Wikipedia reference-graph write/readback after SourceForge archive fallback"
 }
