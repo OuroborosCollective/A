@@ -2,7 +2,7 @@ export interface CryptographyMailSeed {
   url: string
   expectedAuthor?: string
   expectedEmail?: string
-  label: string
+  label?: string
 }
 
 export interface CryptographyMailMessage {
