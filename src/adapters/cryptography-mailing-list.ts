@@ -56,6 +56,39 @@ function isoDate(raw: string): string | undefined {
   return Number.isFinite(parsed) ? new Date(parsed).toISOString() : undefined
 }
 
+function normalizeObfuscatedEmail(value: string): string {
+  let decoded = decodeHtml(value).trim()
+  try { decoded = decodeURIComponent(decoded) } catch { /* retain original text */ }
+  const direct = decoded.match(/([A-Za-z0-9._%+-]+)\s*(?:@|\bat\b)\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})/i)
+  return direct ? `${direct[1]}@${direct[2]}` : ""
+}
+
+function extractSender(html: string, headerText: string): { author: string; email: string } {
+  const headerHtml = html.slice(0, Math.min(html.length, 12_000))
+  const mailAnchor = /<a\b[^>]*href=["']mailto:([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i.exec(headerHtml)
+  if (mailAnchor && typeof mailAnchor.index === "number") {
+    const before = headerHtml.slice(0, mailAnchor.index)
+    // Match a real <b> element only. `<b[^>]*>` also matches `<body>`, which
+    // caused the subject/body prefix to be incorrectly absorbed into author.
+    const boldMatches = [...before.matchAll(/<b(?:\s[^>]*)?>([\s\S]*?)<\/b>/gi)]
+    const nearestBold = boldMatches.at(-1)?.[1] ?? ""
+    const author = textOnly(nearestBold).trim()
+    const visible = textOnly(mailAnchor[2] ?? "")
+    const email = normalizeObfuscatedEmail(visible) || normalizeObfuscatedEmail(mailAnchor[1] ?? "")
+    if (author && email) return { author, email }
+  }
+
+  // Legacy/mirrored pages may flatten the header. Restrict this fallback to one
+  // logical line so an h1/subject cannot be absorbed into the sender name.
+  for (const line of headerText.split("\n")) {
+    const sender = line.match(/^\s*([A-Za-z][A-Za-z .'-]{1,80}?)\s+([A-Za-z0-9._%+-]+)\s+at\s+([A-Za-z0-9.-]+\.[A-Za-z]{2,})\s*$/i)
+    if (!sender || /unsubscribe|majordomo|messages sorted by/i.test(line)) continue
+    return { author: sender[1]?.trim() ?? "", email: `${sender[2]}@${sender[3]}` }
+  }
+
+  return { author: "", email: "" }
+}
+
 function extractLinks(html: string, baseUrl: string): string[] {
   const links = [...html.matchAll(/href=["']([^"']+)["']/gi)]
     .map((match) => match[1])
@@ -71,11 +104,10 @@ function extractLinks(html: string, baseUrl: string): string[] {
 export function parseCryptographyMail(html: string, archiveUrl: string): CryptographyMailMessage {
   const subject = firstMatch(html, /<h1[^>]*>([\s\S]*?)<\/h1>/i)
   const headerText = textOnly(html.slice(0, Math.min(html.length, 12_000)))
-  const senderLine = headerText.split("\n").find((line) => /\bat\b/.test(line) && !/unsubscribe|majordomo/i.test(line)) ?? ""
-  const sender = senderLine.match(/^(.+?)\s+([^\s]+)\s+at\s+([^\s]+)$/i)
-  const author = sender?.[1]?.trim() ?? ""
-  const email = sender ? `${sender[2]}@${sender[3]}` : ""
-  const rawDate = headerText.split("\n").find((line) => /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b.*\b(?:19|20)\d{2}\b/i.test(line))?.trim() ?? ""
+  const { author, email } = extractSender(html, headerText)
+  const rawDate = headerText.split("\n").find((line) => /\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b.*\b(?:19|20)\d{2}\b/i.test(line))?.trim()
+    ?? headerText.match(/\b(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\b[^\n]{0,100}\b(?:19|20)\d{2}\b/i)?.[0]?.trim()
+    ?? ""
   const pre = html.match(/<pre[^>]*>([\s\S]*?)<\/pre>/i)?.[1] ?? ""
   const preText = textOnly(pre)
   const lines = preText.split("\n")
