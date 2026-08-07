@@ -29,7 +29,7 @@ test("human-review tasks cannot be auto-finalized as done", () => {
 
 test("obvious private-key and seed material is rejected", () => {
   assert.equal(containsSecretMaterial("-----BEGIN PRIVATE KEY-----\nsecret\n-----END PRIVATE KEY-----"), true)
-  assert.equal(containsSecretMaterial("xprv9s21ZrQH143K3verylongprivateextendedkeymaterial"), true)
+  assert.equal(containsSecretMaterial("xprv9s21ZrQH143K3mZp9Yd7Vx5Qw2Nn8Bc4Fj6Hs3Ke7Rt1Ua5"), true)
   assert.equal(containsSecretMaterial("ordinary public evidence and hashes only"), false)
   assert.throws(() => validateCompletionInput({ ...base, reproducibleInput: "private key: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" }), /forbidden/)
 })
