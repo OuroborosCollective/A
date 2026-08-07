@@ -2,6 +2,6 @@
   "enabled": true,
   "mode": "preview",
   "base_sha": "d14de529d7a536fb019a9d26413e2e282ac8216c",
-  "evidence_lane": "sourceforge",
-  "reason": "Preview the bounded historical SourceForge REST lane; first seed is the Bitcoin v0.1 news record; no Notion writes"
+  "evidence_lane": "wikipedia",
+  "reason": "Preview revision-bound Wikipedia reference graph collection through MediaWiki API; no Notion writes"
 }
