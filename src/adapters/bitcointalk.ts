@@ -20,6 +20,7 @@ export interface BitcointalkPage {
 }
 
 const MONTH_DATE = /(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+\d{4},\s+\d{1,2}:\d{2}:\d{2}\s+(?:AM|PM)/i
+const POST_OPEN = /<div\b[^>]*class=["'][^"']*\bpost\b[^"']*["'][^>]*>/gi
 
 function decodeHtml(value: string): string {
   return value
@@ -90,6 +91,8 @@ function bodySegment(row: string): string {
     /<div\b[^>]*class=["'][^"']*\bmoderatorbar\b/i,
     /<div\b[^>]*class=["'][^"']*\bsignature\b/i,
     /<div\b[^>]*class=["'][^"']*\bpost_footer\b/i,
+    /<td\b[^>]*class=["'][^"']*\bsmalltext\b/i,
+    /<tr\b/i,
   ]
   let end = tail.length
   for (const pattern of endings) {
@@ -97,6 +100,69 @@ function bodySegment(row: string): string {
     if (found >= 0) end = Math.min(end, found)
   }
   return tail.slice(0, end)
+}
+
+function lastMatch(text: string, pattern: RegExp): RegExpMatchArray | undefined {
+  const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`
+  const matches = [...text.matchAll(new RegExp(pattern.source, flags))]
+  return matches.at(-1)
+}
+
+function nearestTopic(prefix: string): { href: string; topicId: string; title: string } | undefined {
+  const links = [...prefix.matchAll(/<a\b[^>]*href=["']([^"']*(?:\?|&amp;|&)topic=(\d+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)]
+  const match = links.at(-1)
+  if (!match) return undefined
+  return {
+    href: decodeHtml(match[1] ?? ""),
+    topicId: match[2] ?? "unknown",
+    title: textFromHtml(match[3] ?? ""),
+  }
+}
+
+function parseSemanticPostDivs(
+  html: string,
+  fallbackAuthor?: { author: string; authorId?: string }
+): BitcointalkPost[] {
+  const starts = [...html.matchAll(POST_OPEN)]
+  const posts: BitcointalkPost[] = []
+
+  for (let index = 0; index < starts.length; index += 1) {
+    const postStart = starts[index]?.index ?? 0
+    const nextStart = starts[index + 1]?.index ?? html.length
+    const prefix = html.slice(Math.max(0, postStart - 12_000), postStart)
+    const chunk = html.slice(postStart, nextStart)
+
+    const messageId = lastMatch(prefix, /\bid=["']msg(\d+)["']/i)?.[1]
+      ?? lastMatch(prefix, /insertQuoteFast\((\d+)\)/i)?.[1]
+      ?? lastMatch(prefix, /#msg(\d+)/i)?.[1]
+    if (!messageId) continue
+
+    const body = textFromHtml(bodySegment(chunk))
+    if (!body) continue
+
+    const topic = nearestTopic(prefix)
+    const authorMatch = lastMatch(prefix, /action=profile(?:;|&amp;|&)u=(\d+)[^"']*["'][^>]*>([^<]+)<\/a>/i)
+    const postedBy = textFromHtml(prefix.slice(-4_000)).match(/Posted by:\s*([^\n]+)/i)?.[1]?.trim()
+    const authorId = authorMatch?.[1] ?? fallbackAuthor?.authorId
+    const author = decodeHtml(authorMatch?.[2]?.trim() ?? postedBy ?? fallbackAuthor?.author ?? "unknown")
+    const dateMatches = [...prefix.matchAll(new RegExp(MONTH_DATE.source, "gi"))]
+    const rawDate = dateMatches.at(-1)?.[0]
+
+    posts.push({
+      messageId,
+      topicId: topic?.topicId ?? "unknown",
+      title: topic?.title || `Bitcointalk message ${messageId}`,
+      author,
+      authorId,
+      url: topic?.href ? absoluteForumUrl(topic.href) : `${BITCOINTALK.baseUrl}index.php?msg=${messageId}`,
+      publishedAt: parseForumDate(rawDate),
+      forumTimestampRaw: rawDate,
+      body,
+      isSatoshiAccount: authorId === BITCOINTALK.satoshiUserId,
+    })
+  }
+
+  return posts
 }
 
 function parseLegacyShowPosts(
@@ -116,26 +182,20 @@ function parseLegacyShowPosts(
     const body = textFromHtml(bodySegment(row))
     if (!body) continue
 
-    const topicLink = [...`${header}${row}`.matchAll(/<a\b[^>]*href=["']([^"']*[?;&]topic=(\d+)[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi)]
-      .map((item) => ({ href: decodeHtml(item[1] ?? ""), topicId: item[2] ?? "", text: textFromHtml(item[3] ?? "") }))
-      .find((item) => item.topicId)
+    const topicLink = nearestTopic(`${header}${row}`)
     const authorLink = header.match(/action=profile(?:;|&amp;|&)u=(\d+)[^"']*["'][^>]*>([^<]+)<\/a>/i)
     const postedBy = textFromHtml(header).match(/Posted by:\s*([^\n]+)/i)?.[1]?.trim()
     const authorId = authorLink?.[1] ?? fallbackAuthor?.authorId
     const author = decodeHtml(authorLink?.[2]?.trim() ?? postedBy ?? fallbackAuthor?.author ?? "unknown")
     const rawDate = header.match(MONTH_DATE)?.[0]
-    const topicId = topicLink?.topicId || "unknown"
-    const url = topicLink?.href
-      ? absoluteForumUrl(topicLink.href)
-      : `${BITCOINTALK.baseUrl}index.php?msg=${messageId}`
 
     posts.push({
       messageId,
-      topicId,
-      title: topicLink?.text || `Bitcointalk message ${messageId}`,
+      topicId: topicLink?.topicId ?? "unknown",
+      title: topicLink?.title || `Bitcointalk message ${messageId}`,
       author,
       authorId,
-      url,
+      url: topicLink?.href ? absoluteForumUrl(topicLink.href) : `${BITCOINTALK.baseUrl}index.php?msg=${messageId}`,
       publishedAt: parseForumDate(rawDate),
       forumTimestampRaw: rawDate,
       body,
@@ -152,11 +212,15 @@ export function parseBitcointalkPosts(
 ): BitcointalkPost[] {
   const posts: BitcointalkPost[] = []
   const seen = new Set<string>()
+  const candidates = [
+    ...parseLegacyShowPosts(html, fallbackAuthor),
+    ...parseSemanticPostDivs(html, fallbackAuthor),
+  ]
 
-  for (const legacy of parseLegacyShowPosts(html, fallbackAuthor)) {
-    if (!seen.has(legacy.messageId)) {
-      seen.add(legacy.messageId)
-      posts.push(legacy)
+  for (const candidate of candidates) {
+    if (!seen.has(candidate.messageId)) {
+      seen.add(candidate.messageId)
+      posts.push(candidate)
     }
   }
 
@@ -217,17 +281,20 @@ async function fetchHtml(url: string): Promise<string> {
 }
 
 export async function fetchSatoshiForumPosts(start = 0, limit = 10): Promise<BitcointalkPage> {
-  const url = `${BITCOINTALK.satoshiPostsUrl};start=${Math.max(0, Math.floor(start))}`
+  const safeStart = Math.max(0, Math.floor(start))
+  const url = `${BITCOINTALK.satoshiPostsUrl};start=${safeStart}`
   const html = await fetchHtml(url)
   const boundedLimit = Math.max(1, Math.min(limit, 10))
   const parsed = parseBitcointalkPosts(html, { author: "satoshi", authorId: BITCOINTALK.satoshiUserId })
     .filter((post) => post.isSatoshiAccount)
   const posts = parsed.slice(0, boundedLimit)
-  const hasNextLink = new RegExp(`sa=showPosts(?:;|&amp;|&)start=${Math.max(0, Math.floor(start)) + boundedLimit}(?:["';&]|$)`, "i").test(html)
+  const explicitLaterStarts = [...html.matchAll(/sa=showPosts(?:;|&amp;|&)start=(\d+)/gi)]
+    .map((match) => Number(match[1]))
+    .filter((value) => Number.isFinite(value) && value > safeStart)
   return {
     posts,
-    hasMore: hasNextLink || posts.length >= boundedLimit,
-    nextStart: start + posts.length,
+    hasMore: explicitLaterStarts.length > 0 || parsed.length > boundedLimit || posts.length >= boundedLimit,
+    nextStart: safeStart + posts.length,
   }
 }
 
