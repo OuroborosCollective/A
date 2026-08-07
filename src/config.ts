@@ -45,9 +45,10 @@ export const WAYBACK_SEEDS = [
   BITCOINTALK.historicalPostsUrl,
 ] as const
 
-// Direct SourceForge collection is intentionally limited to small, specific REST
-// records. Project-root, Files and SVN/Code pages remain covered by Wayback and
-// Common Crawl to stay within the Cloudflare Free CPU/subrequest budget.
+// Direct SourceForge collection is intentionally preserved as a protected/manual
+// lane for alternate runners. Repeated Cloudflare Free runtime previews returned
+// 1101 before source persistence, so production historical discovery reaches the
+// same SourceForge URLs through Wayback and Common Crawl instead of failing cron.
 export const SOURCEFORGE_SEEDS: SourceForgeSeed[] = [
   {
     apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
@@ -84,12 +85,14 @@ export const COMMON_CRAWL_SEEDS = [
   "sourceforge.net/projects/bitcoin/*",
 ] as const
 
-export const HISTORICAL_DISCOVERY_PROVIDERS = [
+// Kept as a runtime-extensible string list because protected/manual provider lanes
+// still exist, while the automatic free-tier rotation intentionally contains only
+// providers that have passed Cloudflare runtime preview evidence.
+export const HISTORICAL_DISCOVERY_PROVIDERS: readonly string[] = [
   "wayback",
-  "sourceforge",
   "wikipedia",
   "commoncrawl",
-] as const
+]
 
 export const FEEDS: FeedDefinition[] = [
   {

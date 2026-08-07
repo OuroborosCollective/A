@@ -4,7 +4,7 @@
 
 - GitHub REST: `bitcoin/bitcoin` Commits und Releases.
 - Internet Archive CDX / Wayback: frühe Bitcoin.org-, Whitepaper-, SourceForge- und historische Bitcoin-Forum-Seeds. Wayback-Replays sind menschenlesbare Archivfassungen; sie belegen die archivierte Fassung, nicht automatisch deren Wahrheitsgehalt.
-- SourceForge Bitcoin: historische Projektseite, Project News, Bitcoin-v0.1-Meldung vom Januar 2009, Development-Process-Meldung, alter Code-/SVN-Baum und Files-Archiv. SourceForge ist Primärevidenz für den dortigen Projektrecord bzw. die dortige Veröffentlichung, nicht automatisch für jede darin enthaltene Sachbehauptung.
+- SourceForge Bitcoin: historische Projektseite, Project News, Bitcoin-v0.1-Meldung vom Januar 2009, Development-Process-Meldung, alter Code-/SVN-Baum und Files-Archiv. SourceForge ist Primärevidenz für den dortigen Projektrecord bzw. die dortige Veröffentlichung, nicht automatisch für jede darin enthaltene Sachbehauptung. Die Original-URLs bleiben Forschungsseeds; auf der Cloudflare-Free-Runtime werden sie automatisch über Wayback und Common Crawl verfolgt.
 - Wikipedia: revisionsgebundene Artikel zu `Bitcoin` und `Satoshi Nakamoto` zunächst in englischer und deutscher Sprachversion. Die MediaWiki Action API liefert Revision-ID, Zeitstempel, externe Referenzen und Sprachlinks. Wikipedia ist ausschließlich Sekundärquelle/Referenzgraph und wird niemals automatisch zu Primärevidenz hochgestuft.
 - Common Crawl: unabhängiges globales Webarchiv über CDXJ-/URL-Indizes und WARC-Rohdaten. Für die frühe Bitcoin-Recherche werden insbesondere die öffentlichen Kollektionen `CC-MAIN-2008-2009`, `CC-MAIN-2009-2010` und `CC-MAIN-2012` gegen Bitcoin.org-/SourceForge-Seeds abgefragt. WARC-Datei, Offset, Länge, Digest und Capture-Zeit werden erhalten. Common Crawl ist breit, aber nicht vollständig.
 - Bitcointalk: historische Beiträge des Kontos `satoshi` (`u=3`) über `sa=showPosts`, niedrigfrequent und zustandsbehaftet eingelesen.
@@ -15,12 +15,13 @@
 Cloudflare Free stellt nur eine begrenzte Anzahl Cron Trigger bereit. Die bestehende 6-Stunden-Archiv-Cron wird deshalb als zustandsbehaftete Rotation genutzt:
 
 1. Wayback,
-2. SourceForge,
-3. Wikipedia,
-4. Common Crawl,
-5. danach wieder Wayback.
+2. Wikipedia,
+3. Common Crawl,
+4. danach wieder Wayback.
 
-Pro Invocation wird nur ein Provider in einem kleinen Batch abgefragt. Dadurch entstehen keine zusätzlichen Cron Trigger und die Zahl externer Subrequests bleibt begrenzt. Die Provider können über geschützte `/run/wayback`, `/run/sourceforge`, `/run/wikipedia` und `/run/commoncrawl` Endpunkte auch einzeln ausgeführt werden.
+SourceForge bleibt **inhaltlich Bestandteil der automatischen Recherche**, wird auf dieser Runtime aber über seine Original-URLs in Wayback und Common Crawl verfolgt. Drei revisionsgebundene Preview-Versuche der direkten SourceForge-Origin-Lane endeten reproduzierbar mit Cloudflare `1101`, jeweils bevor ein Source-Record persistiert wurde. Deshalb wird dieser Origin nicht in die Produktions-Cron gezwungen. Der geschützte `/run/sourceforge`-Endpunkt und die REST-Seeds bleiben für einen späteren GitHub-/anderen Runner erhalten.
+
+Pro Invocation wird nur ein stabiler Provider in einem kleinen Batch abgefragt. Dadurch entstehen keine zusätzlichen Cron Trigger und die Zahl externer Subrequests bleibt begrenzt. `/run/wayback`, `/run/wikipedia` und `/run/commoncrawl` können einzeln revisionsgebunden geprüft werden.
 
 ## Archiv-Wahrheitsregel
 
@@ -34,6 +35,8 @@ Ein Archivtreffer bedeutet: Eine bestimmte Fassung wurde zu einem bestimmten Zei
 ## SourceForge-Wahrheitsregel
 
 Ein historischer SourceForge-News-, Files- oder Code-Eintrag belegt zunächst die entsprechende Aktivität innerhalb des damaligen Bitcoin-Projekts. Automatisch extrahierte Aussagen werden weiterhin nur als `Offen` + `Behauptet` in den Claims & Evidence Ledger geschrieben. SourceForge-Folgesuchen prüfen insbesondere alte SVN-Revisionen, Releases, Artefakte, Migrationen zu bitcoin.org/GitHub und Archivkopien.
+
+Der direkte SourceForge-Adapter ist nicht gelöscht: Er besitzt kleine REST-Seeds und harte Response-Grenzen. Er wird nur nicht automatisch von Cloudflare Free getriggert, solange die reproduzierbare `1101`-Origin/CPU-Problematik dort besteht. Das verhindert einen falschen Green-State und lässt einen späteren GitHub-Actions- oder anderen kostenfreien Runner zu.
 
 ## Wikipedia-Wahrheitsregel
 
