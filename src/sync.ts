@@ -38,7 +38,7 @@ export async function collectCommitPage(
   const windowEnd = state?.windowEnd ?? new Date(now - 30_000).toISOString()
   const windowStart = state?.windowStart ?? state?.cursor ?? new Date(now - 24 * 60 * 60 * 1000).toISOString()
   const page = state?.page ?? 1
-  const result = await fetchBitcoinCoreCommits({ since: windowStart, until: windowEnd, page, perPage: 25, token: githubToken })
+  const result = await fetchBitcoinCoreCommits({ since: windowStart, until: windowEnd, page, perPage: 10, token: githubToken })
   const retrievedAt = new Date().toISOString()
   const records = await Promise.all(result.commits.map((commit) => commitToSource(commit, retrievedAt)))
 
@@ -61,7 +61,7 @@ export async function collectCommitBackfillPage(
     since: "2009-01-01T00:00:00.000Z",
     until: windowEnd,
     page,
-    perPage: 25,
+    perPage: 10,
     token: githubToken,
   })
   const retrievedAt = new Date().toISOString()
