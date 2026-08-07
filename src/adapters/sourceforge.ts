@@ -1,81 +1,93 @@
+export interface SourceForgeSeed {
+  apiUrl: string
+  publicUrl: string
+  kind: "project" | "news" | "code"
+  title?: string
+}
+
 export interface SourceForgePage {
   url: string
+  apiUrl: string
   title: string
   publishedAt?: string
   text: string
-  kind: "project" | "news" | "code" | "files"
+  kind: SourceForgeSeed["kind"]
 }
 
-function decodeEntities(value: string): string {
-  return value
-    .replace(/&nbsp;/gi, " ")
-    .replace(/&amp;/gi, "&")
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, "<")
-    .replace(/&gt;/gi, ">")
-    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+function compact(value: unknown, max = 5000): string {
+  const text = typeof value === "string" ? value : JSON.stringify(value)
+  return (text ?? "").replace(/\s+/g, " ").trim().slice(0, max)
 }
 
-function stripHtml(value: string): string {
-  return decodeEntities(
-    value
-      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
-      .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, " ")
-      .replace(/<[^>]+>/g, " ")
-  ).replace(/\s+/g, " ").trim()
+function dateFrom(value: unknown): string | undefined {
+  if (typeof value !== "string" || !value.trim()) return undefined
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.valueOf()) ? undefined : parsed.toISOString()
 }
 
-function extractTitle(html: string): string {
-  const og = html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1]
-  if (og) return stripHtml(og)
-  const heading = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
-  if (heading) return stripHtml(heading)
-  const title = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
-  return stripHtml(title ?? "SourceForge Bitcoin record").replace(/\s*[-|/]\s*SourceForge(?:\.net)?\s*$/i, "")
+function dateFromUrl(url: string): string | undefined {
+  const match = url.match(/\/news\/(19\d{2}|20\d{2})\/(\d{2})(?:\/|$)/)
+  if (!match) return undefined
+  return `${match[1]}-${match[2]}-01T00:00:00.000Z`
 }
 
-function inferKind(url: string): SourceForgePage["kind"] {
-  if (/\/news(?:\/|$)/i.test(url)) return "news"
-  if (/\/code(?:\/|$)/i.test(url)) return "code"
-  if (/\/files(?:\/|$)/i.test(url)) return "files"
-  return "project"
-}
-
-function extractPublishedAt(text: string, html: string): string | undefined {
-  const iso = html.match(/(?:datePublished|article:published_time)["'][^>]+content=["']([^"']+)["']/i)?.[1]
-    ?? html.match(/content=["']([^"']+)["'][^>]+(?:datePublished|article:published_time)["']/i)?.[1]
-  if (iso) {
-    const date = new Date(iso)
-    if (!Number.isNaN(date.valueOf())) return date.toISOString()
+function titleFrom(payload: Record<string, unknown>, seed: SourceForgeSeed): string {
+  for (const key of ["title", "name", "shortname", "mount_label"]) {
+    const value = payload[key]
+    if (typeof value === "string" && value.trim()) return compact(value, 300)
   }
-
-  const posted = text.match(/Posted by\s+.{0,120}?\b(20\d{2}|19\d{2})-(\d{2})-(\d{2})\b/i)
-    ?? text.match(/\b(20\d{2}|19\d{2})-(\d{2})-(\d{2})\b/)
-  if (!posted) return undefined
-  const [, year, month, day] = posted
-  return `${year}-${month}-${day}T00:00:00.000Z`
+  return seed.title ?? "SourceForge Bitcoin record"
 }
 
-export function parseSourceForgePage(html: string, url: string): SourceForgePage {
-  const text = stripHtml(html)
+function publishedFrom(payload: Record<string, unknown>, seed: SourceForgeSeed): string | undefined {
+  for (const key of ["mod_date", "created_at", "date", "last_updated", "update_date"]) {
+    const parsed = dateFrom(payload[key])
+    if (parsed) return parsed
+  }
+  return dateFromUrl(seed.publicUrl)
+}
+
+function boundedPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const allow = [
+    "_id", "title", "name", "shortname", "summary", "short_description", "description",
+    "text", "author", "mod_date", "created_at", "date", "last_updated", "state", "labels",
+    "url", "api_url", "mount_label", "mount_point", "commit_count", "clone_url_https_anon",
+    "clone_url_ro", "repository_url", "external_homepage", "homepage", "license", "categories",
+  ]
+  const result: Record<string, unknown> = {}
+  for (const key of allow) {
+    const value = payload[key]
+    if (value !== undefined && value !== null) result[key] = value
+  }
+  return result
+}
+
+export function parseSourceForgeRest(payload: unknown, seed: SourceForgeSeed): SourceForgePage {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error(`Unexpected SourceForge REST payload for ${seed.apiUrl}`)
+  }
+  const record = payload as Record<string, unknown>
   return {
-    url,
-    title: extractTitle(html),
-    publishedAt: extractPublishedAt(text, html),
-    text: text.slice(0, 5000),
-    kind: inferKind(url),
+    url: seed.publicUrl,
+    apiUrl: seed.apiUrl,
+    title: titleFrom(record, seed),
+    publishedAt: publishedFrom(record, seed),
+    text: compact(boundedPayload(record)),
+    kind: seed.kind,
   }
 }
 
-export async function fetchSourceForgePage(url: string): Promise<SourceForgePage> {
-  const response = await fetch(url, {
+export async function fetchSourceForgePage(seed: SourceForgeSeed): Promise<SourceForgePage> {
+  const response = await fetch(seed.apiUrl, {
     headers: {
-      "User-Agent": "OuroborosCollective-Satoshi-Research-Worker",
-      "Accept": "text/html,application/xhtml+xml",
+      "User-Agent": "OuroborosCollective-Satoshi-Research-Worker/0.3",
+      "Accept": "application/json",
     },
   })
-  if (!response.ok) throw new Error(`SourceForge request failed: ${response.status}`)
-  return parseSourceForgePage(await response.text(), url)
+  if (!response.ok) throw new Error(`SourceForge REST request failed: ${response.status}`)
+  const lengthHeader = Number(response.headers.get("content-length") ?? "0")
+  if (Number.isFinite(lengthHeader) && lengthHeader > 1_000_000) {
+    throw new Error(`SourceForge REST payload too large: ${lengthHeader}`)
+  }
+  return parseSourceForgeRest(await response.json(), seed)
 }
