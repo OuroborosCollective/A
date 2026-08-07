@@ -1,6 +1,7 @@
 {
   "enabled": true,
-  "mode": "live",
-  "base_sha": "b9fd4a6a4f1cc9c3416e8bcb705ee7e73a9f0dda",
-  "reason": "First live free-runtime evidence run after successful preview, with Notion pacing, Retry-After handling and bounded commit batch"
+  "mode": "preview",
+  "base_sha": "e964d89e525906213a07fc08b065f92930a16c08",
+  "evidence_lane": "sourceforge",
+  "reason": "Preview exact merged historical-source revision against the public SourceForge Bitcoin project without Notion writes"
 }
