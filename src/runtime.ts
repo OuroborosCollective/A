@@ -1,15 +1,23 @@
 import {
   collectCommitBackfillPage,
   collectCommitPage,
+  collectCommonCrawlPage,
   collectFeedPage,
   collectForumPage,
+  collectHistoricalDiscoveryPage,
   collectReleasePage,
+  collectSourceForgePage,
   collectWaybackPage,
+  collectWikipediaPage,
   type CommitBackfillState,
   type CommitSyncState,
+  type CommonCrawlSyncState,
   type FeedSyncState,
   type ForumSyncState,
+  type HistoricalDiscoveryState,
+  type SourceForgeSyncState,
   type WaybackSyncState,
+  type WikipediaSyncState,
 } from "./sync.js"
 import { NOTION_TARGETS } from "./consent.js"
 import {
@@ -32,7 +40,17 @@ import {
 import { deriveAnalysisTasks, deriveFollowUpPlan, extractClaimCandidates } from "./domain/research.js"
 import type { AnalysisTask, HypeSignal, ResearchSource } from "./domain/types.js"
 
-export type Lane = "commits" | "releases" | "wayback" | "feeds" | "forum" | "backfill"
+export type Lane =
+  | "commits"
+  | "releases"
+  | "discovery"
+  | "wayback"
+  | "sourceforge"
+  | "wikipedia"
+  | "commoncrawl"
+  | "feeds"
+  | "forum"
+  | "backfill"
 
 export interface Env {
   DB: D1Database
@@ -61,6 +79,10 @@ function requireNotionToken(env: Env): string {
 function deepResearchEligible(source: ResearchSource): boolean {
   return source.lane === "Satoshi Forum"
     || source.lane === "Forum Claims"
+    || source.lane === "SourceForge"
+    || source.lane === "Wikipedia Reference Graph"
+    || source.lane === "Global Web Archive"
+    || source.subjects.includes("Satoshi")
     || source.subjects.includes("Identität")
     || source.subjects.includes("Kryptografie")
 }
@@ -229,9 +251,37 @@ export async function runLane(lane: Lane, env: Env): Promise<{ lane: Lane; mode:
     if (currentMode === "live") await putState(env.DB, lane, page.nextState)
     return { lane, mode: currentMode, count: page.records.length, hasMore: false }
   }
+  if (lane === "discovery") {
+    const state = await getState<HistoricalDiscoveryState>(env.DB, lane)
+    const page = await collectHistoricalDiscoveryPage(state)
+    await persistSources(env, lane, runId, page.records)
+    if (currentMode === "live") await putState(env.DB, lane, page.nextState)
+    return { lane, mode: currentMode, count: page.records.length, hasMore: page.hasMore }
+  }
   if (lane === "wayback") {
     const state = await getState<WaybackSyncState>(env.DB, lane)
     const page = await collectWaybackPage(state)
+    await persistSources(env, lane, runId, page.records)
+    if (currentMode === "live") await putState(env.DB, lane, page.nextState)
+    return { lane, mode: currentMode, count: page.records.length, hasMore: page.hasMore }
+  }
+  if (lane === "sourceforge") {
+    const state = await getState<SourceForgeSyncState>(env.DB, lane)
+    const page = await collectSourceForgePage(state)
+    await persistSources(env, lane, runId, page.records)
+    if (currentMode === "live") await putState(env.DB, lane, page.nextState)
+    return { lane, mode: currentMode, count: page.records.length, hasMore: page.hasMore }
+  }
+  if (lane === "wikipedia") {
+    const state = await getState<WikipediaSyncState>(env.DB, lane)
+    const page = await collectWikipediaPage(state)
+    await persistSources(env, lane, runId, page.records)
+    if (currentMode === "live") await putState(env.DB, lane, page.nextState)
+    return { lane, mode: currentMode, count: page.records.length, hasMore: page.hasMore }
+  }
+  if (lane === "commoncrawl") {
+    const state = await getState<CommonCrawlSyncState>(env.DB, lane)
+    const page = await collectCommonCrawlPage(state)
     await persistSources(env, lane, runId, page.records)
     if (currentMode === "live") await putState(env.DB, lane, page.nextState)
     return { lane, mode: currentMode, count: page.records.length, hasMore: page.hasMore }
@@ -262,7 +312,7 @@ export function laneForCron(cron: string): Lane | null {
   switch (cron) {
     case "*/15 * * * *": return "commits"
     case "7 * * * *": return "releases"
-    case "17 */6 * * *": return "wayback"
+    case "17 */6 * * *": return "discovery"
     case "*/30 * * * *": return "feeds"
     case "23 */2 * * *": return "forum"
     default: return null
@@ -296,7 +346,8 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
   if (request.method === "POST" && url.pathname.startsWith("/run/")) {
     if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 })
     const lane = url.pathname.slice("/run/".length) as Lane
-    if (!["commits", "releases", "wayback", "feeds", "forum", "backfill"].includes(lane)) return new Response("Unknown lane", { status: 404 })
+    const allowed: Lane[] = ["commits", "releases", "discovery", "wayback", "sourceforge", "wikipedia", "commoncrawl", "feeds", "forum", "backfill"]
+    if (!allowed.includes(lane)) return new Response("Unknown lane", { status: 404 })
     return Response.json(await runLane(lane, env))
   }
   return new Response("Not found", { status: 404 })

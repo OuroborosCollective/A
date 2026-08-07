@@ -1,4 +1,13 @@
-import { FEEDS, WAYBACK_SEEDS, type FeedDefinition } from "./config.js"
+import {
+  COMMON_CRAWL_COLLECTIONS,
+  COMMON_CRAWL_SEEDS,
+  FEEDS,
+  HISTORICAL_DISCOVERY_PROVIDERS,
+  SOURCEFORGE_SEEDS,
+  WAYBACK_SEEDS,
+  WIKIPEDIA_SEEDS,
+  type FeedDefinition,
+} from "./config.js"
 import { fetchFeed, type FeedItem } from "./adapters/feed.js"
 import {
   fetchBitcoinCoreCommits,
@@ -17,6 +26,15 @@ import {
   fetchSatoshiForumPosts,
   type BitcointalkPost,
 } from "./adapters/bitcointalk.js"
+import { fetchSourceForgePage, type SourceForgePage } from "./adapters/sourceforge.js"
+import { fetchWikipediaReferencePage, type WikipediaReferencePage } from "./adapters/wikipedia.js"
+import {
+  commonCrawlIndexRecordUrl,
+  commonCrawlTimestampToIso,
+  commonCrawlWarcUrl,
+  fetchCommonCrawlCaptures,
+  type CommonCrawlCapture,
+} from "./adapters/commoncrawl.js"
 import { canonicalSourceId, canonicalizeUrl } from "./domain/canonical.js"
 import { sha256Hex, stableJson } from "./domain/hash.js"
 import { calculateHype } from "./domain/research.js"
@@ -85,20 +103,117 @@ export async function collectReleasePage(githubToken?: string): Promise<SyncPage
 export interface WaybackSyncState { seedIndex?: number }
 
 export async function collectWaybackPage(
-  state: WaybackSyncState | undefined
+  state: WaybackSyncState | undefined,
+  recordLimit = 2
 ): Promise<SyncPage<ResearchSource, WaybackSyncState>> {
   const seedIndex = state?.seedIndex ?? 0
   const seed = WAYBACK_SEEDS[seedIndex]
   if (!seed) return { records: [], hasMore: false, nextState: { seedIndex: 0 } }
   const captures = await fetchWaybackCaptures(seed)
   const retrievedAt = new Date().toISOString()
-  const records = await Promise.all(captures.slice(0, 25).map((capture) => captureToSource(capture, retrievedAt)))
+  const bounded = Math.max(1, Math.min(5, Math.floor(recordLimit)))
+  const records = await Promise.all(captures.slice(0, bounded).map((capture) => captureToSource(capture, retrievedAt)))
   const nextIndex = seedIndex + 1
   return {
     records,
     hasMore: nextIndex < WAYBACK_SEEDS.length,
     nextState: { seedIndex: nextIndex < WAYBACK_SEEDS.length ? nextIndex : 0 },
   }
+}
+
+export interface SourceForgeSyncState { seedIndex?: number }
+
+export async function collectSourceForgePage(
+  state: SourceForgeSyncState | undefined
+): Promise<SyncPage<ResearchSource, SourceForgeSyncState>> {
+  const seedIndex = state?.seedIndex ?? 0
+  const seed = SOURCEFORGE_SEEDS[seedIndex]
+  if (!seed) return { records: [], hasMore: false, nextState: { seedIndex: 0 } }
+  const page = await fetchSourceForgePage(seed)
+  const retrievedAt = new Date().toISOString()
+  const nextIndex = seedIndex + 1
+  return {
+    records: [await sourceForgeToSource(page, retrievedAt)],
+    hasMore: nextIndex < SOURCEFORGE_SEEDS.length,
+    nextState: { seedIndex: nextIndex < SOURCEFORGE_SEEDS.length ? nextIndex : 0 },
+  }
+}
+
+export interface WikipediaSyncState { seedIndex?: number }
+
+export async function collectWikipediaPage(
+  state: WikipediaSyncState | undefined
+): Promise<SyncPage<ResearchSource, WikipediaSyncState>> {
+  const seedIndex = state?.seedIndex ?? 0
+  const seed = WIKIPEDIA_SEEDS[seedIndex]
+  if (!seed) return { records: [], hasMore: false, nextState: { seedIndex: 0 } }
+  const page = await fetchWikipediaReferencePage(seed)
+  const retrievedAt = new Date().toISOString()
+  const nextIndex = seedIndex + 1
+  return {
+    records: [await wikipediaToSource(page, retrievedAt)],
+    hasMore: nextIndex < WIKIPEDIA_SEEDS.length,
+    nextState: { seedIndex: nextIndex < WIKIPEDIA_SEEDS.length ? nextIndex : 0 },
+  }
+}
+
+export interface CommonCrawlSyncState { seedIndex?: number; collectionIndex?: number }
+
+export async function collectCommonCrawlPage(
+  state: CommonCrawlSyncState | undefined
+): Promise<SyncPage<ResearchSource, CommonCrawlSyncState>> {
+  const seedIndex = state?.seedIndex ?? 0
+  const collectionIndex = state?.collectionIndex ?? 0
+  const seed = COMMON_CRAWL_SEEDS[seedIndex]
+  const collection = COMMON_CRAWL_COLLECTIONS[collectionIndex]
+  if (!seed || !collection) return { records: [], hasMore: false, nextState: { seedIndex: 0, collectionIndex: 0 } }
+  const captures = await fetchCommonCrawlCaptures(seed, collection, 2)
+  const retrievedAt = new Date().toISOString()
+  const records = await Promise.all(captures.map((capture) => commonCrawlToSource(capture, retrievedAt)))
+
+  const nextSeed = seedIndex + 1
+  const wrappedSeed = nextSeed >= COMMON_CRAWL_SEEDS.length
+  const nextCollection = wrappedSeed ? collectionIndex + 1 : collectionIndex
+  const wrappedCollection = nextCollection >= COMMON_CRAWL_COLLECTIONS.length
+  return {
+    records,
+    hasMore: !(wrappedSeed && wrappedCollection),
+    nextState: {
+      seedIndex: wrappedSeed ? 0 : nextSeed,
+      collectionIndex: wrappedCollection ? 0 : nextCollection,
+    },
+  }
+}
+
+export interface HistoricalDiscoveryState {
+  providerIndex?: number
+  wayback?: WaybackSyncState
+  sourceforge?: SourceForgeSyncState
+  wikipedia?: WikipediaSyncState
+  commoncrawl?: CommonCrawlSyncState
+}
+
+export async function collectHistoricalDiscoveryPage(
+  state: HistoricalDiscoveryState | undefined
+): Promise<SyncPage<ResearchSource, HistoricalDiscoveryState>> {
+  const providerIndex = state?.providerIndex ?? 0
+  const provider = HISTORICAL_DISCOVERY_PROVIDERS[providerIndex] ?? "wayback"
+  const nextProviderIndex = (providerIndex + 1) % HISTORICAL_DISCOVERY_PROVIDERS.length
+
+  if (provider === "wayback") {
+    const page = await collectWaybackPage(state?.wayback, 2)
+    return { records: page.records, hasMore: true, nextState: { ...state, providerIndex: nextProviderIndex, wayback: page.nextState } }
+  }
+  if (provider === "sourceforge") {
+    const page = await collectSourceForgePage(state?.sourceforge)
+    return { records: page.records, hasMore: true, nextState: { ...state, providerIndex: nextProviderIndex, sourceforge: page.nextState } }
+  }
+  if (provider === "wikipedia") {
+    const page = await collectWikipediaPage(state?.wikipedia)
+    return { records: page.records, hasMore: true, nextState: { ...state, providerIndex: nextProviderIndex, wikipedia: page.nextState } }
+  }
+  const page = await collectCommonCrawlPage(state?.commoncrawl)
+  return { records: page.records, hasMore: true, nextState: { ...state, providerIndex: nextProviderIndex, commoncrawl: page.nextState } }
 }
 
 export interface FeedSyncState { feedIndex?: number }
@@ -221,7 +336,86 @@ async function captureToSource(capture: WaybackCapture, retrievedAt: string): Pr
     adapter: "Internet Archive CDX",
     status: "In Prüfung",
     subjects: ["Satoshi", "Bitcoin", "Historie"],
-    summary: `HTTP ${capture.statuscode}; MIME ${capture.mimetype}; CDX-Digest ${capture.digest}.`,
+    summary: `HTTP ${capture.statuscode}; MIME ${capture.mimetype}; CDX-Digest ${capture.digest}. Wayback liefert eine menschenlesbare historische Replay-Fassung; der Capture beweist nicht automatisch den Wahrheitsgehalt des archivierten Artikels.`,
+    primarySource: false,
+    independentConfirmations: 1,
+  }
+}
+
+async function sourceForgeToSource(page: SourceForgePage, retrievedAt: string): Promise<ResearchSource> {
+  const typeMap: Record<SourceForgePage["kind"], string> = {
+    project: "SourceForge-Projektseite",
+    news: "SourceForge-Projektmeldung",
+    code: "SourceForge-Codearchiv",
+    files: "SourceForge-Dateiarchiv",
+  }
+  return {
+    canonicalId: await canonicalSourceId("sourceforge-bitcoin", page.url, page.url),
+    title: page.title,
+    lane: "SourceForge",
+    sourceType: typeMap[page.kind],
+    evidenceTier: "Primär belegt",
+    originalUrl: canonicalizeUrl(page.url),
+    publishedAt: page.publishedAt,
+    retrievedAt,
+    upstreamId: page.url,
+    recordSha256: await sha256Hex(stableJson(page)),
+    contentHashVerified: false,
+    adapter: "SourceForge public HTML",
+    status: "In Prüfung",
+    subjects: ["Satoshi", "Bitcoin", "Historie", "Technik"],
+    summary: `Historischer SourceForge-Projektrecord. Primärevidenz gilt für die Veröffentlichung/Projektaktivität auf SourceForge, nicht automatisch für jede darin enthaltene Sachbehauptung. Inhalt: ${page.text}`,
+    primarySource: true,
+    independentConfirmations: 0,
+  }
+}
+
+async function wikipediaToSource(page: WikipediaReferencePage, retrievedAt: string): Promise<ResearchSource> {
+  const refs = page.externalLinks.slice(0, 20).join(" | ") || "keine externen Links im abgefragten API-Fenster"
+  const languages = page.languageLinks.slice(0, 20).map((item) => `${item.language}:${item.title}`).join(" | ") || "keine Sprachlinks im abgefragten API-Fenster"
+  return {
+    canonicalId: await canonicalSourceId("wikipedia-revision", `${page.language}:${page.revisionId}`, page.url),
+    title: `${page.title} (${page.language}.wikipedia)` ,
+    lane: "Wikipedia Reference Graph",
+    sourceType: "Wikipedia-Revision-und-Referenzgraph",
+    evidenceTier: "Behauptet",
+    originalUrl: canonicalizeUrl(page.url),
+    archiveUrl: canonicalizeUrl(page.permanentUrl),
+    publishedAt: page.revisionTimestamp,
+    retrievedAt,
+    upstreamId: `page:${page.pageId};revision:${page.revisionId};lang:${page.language}`,
+    recordSha256: await sha256Hex(stableJson(page)),
+    contentHashVerified: false,
+    adapter: "MediaWiki Action API",
+    status: "In Prüfung",
+    subjects: ["Satoshi", "Bitcoin", "Historie", "Referenzgraph"],
+    summary: `Wikipedia wird nur als Sekundärquelle/Referenzgraph verwendet. Revision ${page.revisionId}. Externe Referenzen: ${refs}. Sprachversionen: ${languages}. Jede konkrete Aussage muss auf die zitierte Primärquelle oder eine unabhängige Archivfassung zurückgeführt werden.`,
+    primarySource: false,
+    independentConfirmations: 0,
+  }
+}
+
+async function commonCrawlToSource(capture: CommonCrawlCapture, retrievedAt: string): Promise<ResearchSource> {
+  const warcUrl = commonCrawlWarcUrl(capture)
+  const archiveIndexUrl = commonCrawlIndexRecordUrl(capture)
+  return {
+    canonicalId: await canonicalSourceId("common-crawl", `${capture.collection}:${capture.timestamp}:${capture.digest ?? capture.url}`, capture.url),
+    title: `Common Crawl ${capture.collection}: ${capture.url}`,
+    lane: "Global Web Archive",
+    sourceType: "Global-Webarchiv-Capture",
+    evidenceTier: "Unabhängig archiviert",
+    originalUrl: canonicalizeUrl(capture.url),
+    archiveUrl: warcUrl ?? archiveIndexUrl,
+    publishedAt: commonCrawlTimestampToIso(capture.timestamp),
+    retrievedAt,
+    upstreamId: `${capture.collection}:${capture.timestamp}:${capture.url}`,
+    upstreamDigest: capture.digest,
+    recordSha256: await sha256Hex(stableJson(capture)),
+    contentHashVerified: false,
+    adapter: "Common Crawl CDXJ/WARC",
+    status: "In Prüfung",
+    subjects: ["Satoshi", "Bitcoin", "Historie", "Globales Archiv"],
+    summary: `Globaler Webarchiv-Capture aus ${capture.collection}. MIME ${capture.mimeDetected ?? capture.mime ?? "unbekannt"}; Sprache ${capture.languages ?? "unbekannt"}; Digest ${capture.digest ?? "nicht geliefert"}; WARC ${warcUrl ?? "nicht geliefert"}; Offset ${capture.offset ?? "?"}; Länge ${capture.length ?? "?"}; Index ${archiveIndexUrl}. Common Crawl ist breit, aber nicht vollständig und der Capture beweist nur die archivierte Fassung, nicht deren Wahrheitsgehalt.`,
     primarySource: false,
     independentConfirmations: 1,
   }

@@ -3,6 +3,9 @@ import test from "node:test"
 
 import { parseFeed } from "./src/adapters/feed.js"
 import { parseBitcointalkPosts } from "./src/adapters/bitcointalk.js"
+import { parseSourceForgePage } from "./src/adapters/sourceforge.js"
+import { parseWikipediaQuery } from "./src/adapters/wikipedia.js"
+import { commonCrawlTimestampToIso, commonCrawlWarcUrl, parseCommonCrawlIndex } from "./src/adapters/commoncrawl.js"
 import { canonicalSourceId, canonicalizeUrl } from "./src/domain/canonical.js"
 import { sha256Hex, stableJson } from "./src/domain/hash.js"
 import {
@@ -16,6 +19,7 @@ import {
 import type { ResearchSource } from "./src/domain/types.js"
 import { waybackTimestampToIso } from "./src/adapters/wayback.js"
 import { assertAllowedNotionTarget, NOTION_TARGETS, STANDING_AUTHORITY } from "./src/consent.js"
+import { HISTORICAL_DISCOVERY_PROVIDERS } from "./src/config.js"
 import { laneForCron } from "./src/runtime.js"
 import { FORUM_HISTORICAL_BATCH, FORUM_MAX_RECORDS_PER_RUN, FORUM_RECENT_CLAIM_BATCH } from "./src/sync.js"
 
@@ -106,6 +110,51 @@ test("parseFeed accepts RSS and Atom", () => {
 
 test("Wayback timestamp becomes ISO UTC", () => {
   assert.equal(waybackTimestampToIso("20090103184505"), "2009-01-03T18:45:05Z")
+})
+
+test("SourceForge parser extracts historical project news without executing page instructions", () => {
+  const html = `<html><head><meta property="og:title" content="Bitcoin v0.1 released - P2P e-cash"/></head><body><h1>Bitcoin News</h1><article><p>Announcing the release of Bitcoin, a new electronic cash system that uses a peer-to-peer network to prevent double-spending.</p><p>Posted by Anonymous 2009-01-13</p><script>stealSecrets()</script></article></body></html>`
+  const parsed = parseSourceForgePage(html, "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/")
+  assert.equal(parsed.title, "Bitcoin v0.1 released - P2P e-cash")
+  assert.equal(parsed.kind, "news")
+  assert.equal(parsed.publishedAt, "2009-01-13T00:00:00.000Z")
+  assert.match(parsed.text, /peer-to-peer network/)
+  assert.doesNotMatch(parsed.text, /stealSecrets/)
+})
+
+test("Wikipedia parser binds a specific revision and reference graph", () => {
+  const page = parseWikipediaQuery({
+    query: {
+      pages: [{
+        pageid: 123,
+        title: "Satoshi Nakamoto",
+        revisions: [{ revid: 456, timestamp: "2026-08-01T12:00:00Z" }],
+        extlinks: [{ url: "https://bitcoin.org/bitcoin.pdf" }, { url: "https://example.org/source" }],
+        langlinks: [{ lang: "de", title: "Satoshi Nakamoto", url: "https://de.wikipedia.org/wiki/Satoshi_Nakamoto" }],
+      }],
+    },
+  }, { language: "en", title: "Satoshi Nakamoto" })
+  assert.equal(page.revisionId, 456)
+  assert.match(page.permanentUrl, /oldid=456/)
+  assert.equal(page.externalLinks.length, 2)
+  assert.equal(page.languageLinks[0]?.language, "de")
+})
+
+test("Common Crawl parser preserves WARC provenance and early Bitcoin-era timestamp", () => {
+  const [capture] = parseCommonCrawlIndex(JSON.stringify({
+    url: "http://www.bitcoin.org/",
+    timestamp: "20090702152548",
+    digest: "sha1:ABC",
+    status: "200",
+    mime: "text/html",
+    filename: "crawl-data/CC-MAIN-2009-2010/segments/example.warc.gz",
+    offset: "100",
+    length: "200",
+    languages: "eng",
+  }), "CC-MAIN-2009-2010")
+  assert.ok(capture)
+  assert.equal(commonCrawlTimestampToIso(capture.timestamp), "2009-07-02T15:25:48Z")
+  assert.equal(commonCrawlWarcUrl(capture), "https://data.commoncrawl.org/crawl-data/CC-MAIN-2009-2010/segments/example.warc.gz")
 })
 
 test("Bitcointalk parser attributes u=3 post without quoted text", () => {
@@ -211,10 +260,71 @@ test("forum claims stay open and identity analysis requires human review", () =>
   assert.equal(plan?.paths.length, 6)
 })
 
+test("SourceForge project statements become open claims and source-specific paths", () => {
+  const source: ResearchSource = {
+    canonicalId: "sourceforge-bitcoin:abc",
+    title: "Bitcoin v0.1 released - P2P e-cash",
+    lane: "SourceForge",
+    sourceType: "SourceForge-Projektmeldung",
+    evidenceTier: "Primär belegt",
+    originalUrl: "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
+    publishedAt: "2009-01-13T00:00:00.000Z",
+    retrievedAt: "2026-08-07T15:00:00.000Z",
+    upstreamId: "release-v0.1",
+    recordSha256: "def",
+    contentHashVerified: false,
+    adapter: "SourceForge public HTML",
+    status: "In Prüfung",
+    subjects: ["Satoshi", "Bitcoin", "Historie", "Technik"],
+    summary: "Historischer SourceForge-Projektrecord. Primärevidenz gilt für die Veröffentlichung/Projektaktivität auf SourceForge, nicht automatisch für jede darin enthaltene Sachbehauptung. Inhalt: Announcing the release of Bitcoin, a new electronic cash system that uses a peer-to-peer network to prevent double-spending. The software is still alpha and experimental, with no guarantee that the system state will never need to be restarted.",
+    primarySource: true,
+    independentConfirmations: 0,
+  }
+  const claims = extractClaimCandidates(source)
+  assert.ok(claims.length >= 1)
+  assert.ok(claims.every((claim) => claim.evidenceTier === "Behauptet"))
+  const plan = deriveFollowUpPlan(source, claims, deriveAnalysisTasks(source, claims))
+  assert.equal(plan?.priority, "A")
+  assert.match(plan?.paths[1] ?? "", /Wayback und Common Crawl/)
+  assert.match(plan?.truthRule ?? "", /SourceForge-Projektrecord/)
+})
+
+test("Wikipedia remains a reference graph and generates archive follow-up rather than primary proof", () => {
+  const source: ResearchSource = {
+    canonicalId: "wikipedia-revision:abc",
+    title: "Satoshi Nakamoto (en.wikipedia)",
+    lane: "Wikipedia Reference Graph",
+    sourceType: "Wikipedia-Revision-und-Referenzgraph",
+    evidenceTier: "Behauptet",
+    originalUrl: "https://en.wikipedia.org/wiki/Satoshi_Nakamoto",
+    archiveUrl: "https://en.wikipedia.org/wiki/Satoshi_Nakamoto?oldid=123",
+    publishedAt: "2026-08-01T00:00:00Z",
+    retrievedAt: "2026-08-07T15:00:00Z",
+    upstreamId: "page:1;revision:123;lang:en",
+    recordSha256: "ghi",
+    contentHashVerified: false,
+    adapter: "MediaWiki Action API",
+    status: "In Prüfung",
+    subjects: ["Satoshi", "Bitcoin", "Historie", "Referenzgraph"],
+    summary: "Wikipedia wird nur als Sekundärquelle/Referenzgraph verwendet. Externe Referenzen: https://bitcoin.org/bitcoin.pdf",
+    primarySource: false,
+    independentConfirmations: 0,
+  }
+  assert.equal(extractClaimCandidates(source).length, 0)
+  const plan = deriveFollowUpPlan(source, [], deriveAnalysisTasks(source, []))
+  assert.equal(plan?.seedType, "Sammlung")
+  assert.match(plan?.paths[2] ?? "", /Wayback und Common Crawl/)
+  assert.match(plan?.truthRule ?? "", /Sekundärquelle/)
+})
+
 test("forum lane stays at two records per invocation for free-worker subrequest safety", () => {
   assert.equal(FORUM_HISTORICAL_BATCH, 1)
   assert.equal(FORUM_RECENT_CLAIM_BATCH, 1)
   assert.equal(FORUM_MAX_RECORDS_PER_RUN, 2)
+})
+
+test("historical discovery multiplexes four providers onto the existing free cron slot", () => {
+  assert.deepEqual(HISTORICAL_DISCOVERY_PROVIDERS, ["wayback", "sourceforge", "wikipedia", "commoncrawl"])
 })
 
 test("standing authority permits only four bounded research data sources", () => {
@@ -230,7 +340,7 @@ test("standing authority permits only four bounded research data sources", () =>
 test("cron triggers map deterministically to bounded lanes", () => {
   assert.equal(laneForCron("*/15 * * * *"), "commits")
   assert.equal(laneForCron("7 * * * *"), "releases")
-  assert.equal(laneForCron("17 */6 * * *"), "wayback")
+  assert.equal(laneForCron("17 */6 * * *"), "discovery")
   assert.equal(laneForCron("*/30 * * * *"), "feeds")
   assert.equal(laneForCron("23 */2 * * *"), "forum")
   assert.equal(laneForCron("* * * * *"), null)

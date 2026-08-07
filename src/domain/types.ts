@@ -11,6 +11,9 @@ export type EvidenceTier =
 export type SourceLane =
   | "Bitcoin Core"
   | "Historische Webarchive"
+  | "Global Web Archive"
+  | "SourceForge"
+  | "Wikipedia Reference Graph"
   | "Technische Berichte"
   | "Medien und Hype"
   | "Satoshi Forum"

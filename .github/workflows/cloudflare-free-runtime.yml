@@ -26,6 +26,11 @@ on:
         options:
           - commits
           - forum
+          - discovery
+          - wayback
+          - sourceforge
+          - wikipedia
+          - commoncrawl
 
 permissions:
   contents: read
@@ -83,7 +88,8 @@ jobs:
           if (req.enabled !== true) throw new Error('deploy request is not enabled');
           if (!['preview', 'live'].includes(req.mode)) throw new Error('deploy request mode must be preview or live');
           const lane = req.evidence_lane ?? 'commits';
-          if (!['commits', 'forum'].includes(lane)) throw new Error('evidence_lane must be commits or forum');
+          const allowed = ['commits', 'forum', 'discovery', 'wayback', 'sourceforge', 'wikipedia', 'commoncrawl'];
+          if (!allowed.includes(lane)) throw new Error(`evidence_lane must be one of ${allowed.join(', ')}`);
           if (req.base_sha !== process.env.PR_BASE_SHA) throw new Error(`deploy request base_sha ${req.base_sha} does not match PR base ${process.env.PR_BASE_SHA}`);
           process.stdout.write(`mode=${req.mode}\nlane=${lane}\n`);
           NODE
@@ -95,7 +101,8 @@ jobs:
           if (req.enabled !== true) throw new Error('deploy request is not enabled');
           if (!['preview', 'live'].includes(req.mode)) throw new Error('deploy request mode must be preview or live');
           const lane = req.evidence_lane ?? 'commits';
-          if (!['commits', 'forum'].includes(lane)) throw new Error('evidence_lane must be commits or forum');
+          const allowed = ['commits', 'forum', 'discovery', 'wayback', 'sourceforge', 'wikipedia', 'commoncrawl'];
+          if (!allowed.includes(lane)) throw new Error(`evidence_lane must be one of ${allowed.join(', ')}`);
           const parent = cp.execSync('git rev-parse HEAD^', { encoding: 'utf8' }).trim();
           if (req.base_sha !== parent) throw new Error(`deploy request base_sha ${req.base_sha} does not match parent ${parent}`);
           process.stdout.write(`mode=${req.mode}\nlane=${lane}\n`);
