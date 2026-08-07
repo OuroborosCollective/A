@@ -72,3 +72,13 @@ CREATE TABLE IF NOT EXISTS analysis_results (
 
 CREATE INDEX IF NOT EXISTS idx_analysis_results_executor ON analysis_results(executor, completed_at DESC);
 CREATE INDEX IF NOT EXISTS idx_analysis_results_status ON analysis_results(status, completed_at DESC);
+
+CREATE TABLE IF NOT EXISTS analysis_publications (
+  task_id TEXT PRIMARY KEY,
+  result_sha256 TEXT NOT NULL,
+  notion_page_id TEXT NOT NULL,
+  notion_readback_at TEXT NOT NULL,
+  FOREIGN KEY (task_id) REFERENCES analysis_results(task_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_publications_readback ON analysis_publications(notion_readback_at DESC);
