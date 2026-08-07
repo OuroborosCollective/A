@@ -14,6 +14,7 @@ export type SourceLane =
   | "Global Web Archive"
   | "SourceForge"
   | "Wikipedia Reference Graph"
+  | "Cryptography Mailing List"
   | "Technische Berichte"
   | "Medien und Hype"
   | "Satoshi Forum"
