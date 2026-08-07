@@ -1,4 +1,5 @@
 import { AUTHORITY_VERSION } from "./consent.js"
+import type { AnalysisTask } from "./domain/types.js"
 
 export interface D1Result<T = unknown> {
   success: boolean
@@ -39,6 +40,36 @@ export async function rememberRecord(
   await db.prepare(
     "INSERT INTO records(canonical_id, kind, record_sha256, notion_page_id, payload_json, last_seen_at) VALUES(?, ?, ?, ?, ?, ?) ON CONFLICT(canonical_id) DO UPDATE SET record_sha256=excluded.record_sha256, notion_page_id=COALESCE(excluded.notion_page_id, records.notion_page_id), payload_json=excluded.payload_json, last_seen_at=excluded.last_seen_at"
   ).bind(id, kind, recordSha256, notionPageId ?? null, JSON.stringify(payload), new Date().toISOString()).run()
+}
+
+export async function queueAnalysisTask(db: D1Database, task: AnalysisTask): Promise<void> {
+  await db.prepare(
+    "INSERT INTO analysis_queue(task_id, source_canonical_id, kind, executor, status, requires_human_review, payload_json, created_at, updated_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(task_id) DO UPDATE SET kind=excluded.kind, executor=excluded.executor, requires_human_review=excluded.requires_human_review, payload_json=excluded.payload_json, updated_at=excluded.updated_at"
+  ).bind(
+    task.taskId,
+    task.sourceCanonicalId,
+    task.kind,
+    task.executor,
+    task.status,
+    task.requiresHumanReview ? 1 : 0,
+    JSON.stringify(task),
+    task.createdAt,
+    new Date().toISOString()
+  ).run()
+}
+
+export async function listPendingAnalysisTasks(db: D1Database, limit = 25): Promise<AnalysisTask[]> {
+  const bounded = Math.max(1, Math.min(100, Math.floor(limit)))
+  const result = await db.prepare(
+    "SELECT payload_json FROM analysis_queue WHERE status = 'pending' ORDER BY requires_human_review ASC, created_at ASC LIMIT ?"
+  ).bind(bounded).all<{ payload_json: string }>()
+  return (result.results ?? []).flatMap((row) => {
+    try {
+      return [JSON.parse(row.payload_json) as AnalysisTask]
+    } catch {
+      return []
+    }
+  })
 }
 
 export async function addReceipt(

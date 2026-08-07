@@ -18,12 +18,20 @@ on:
         required: true
         default: false
         type: boolean
+      evidence_lane:
+        description: "Controlled lane to execute after deployment"
+        required: true
+        default: commits
+        type: choice
+        options:
+          - commits
+          - forum
 
 permissions:
   contents: read
 
 concurrency:
-  group: satoshi-cloudflare-runtime
+  group: ${{ github.event_name == 'pull_request' && format('satoshi-cloudflare-verify-{0}', github.event.pull_request.head.sha) || 'satoshi-cloudflare-production' }}
   cancel-in-progress: false
 
 jobs:
@@ -63,7 +71,7 @@ jobs:
       - run: npm install --ignore-scripts
       - run: npm run verify
 
-      - name: Resolve requested deployment mode
+      - name: Resolve requested deployment mode and evidence lane
         id: request
         shell: bash
         run: |
@@ -74,8 +82,10 @@ jobs:
           const req = JSON.parse(fs.readFileSync('.deploy/cloudflare-request.json', 'utf8'));
           if (req.enabled !== true) throw new Error('deploy request is not enabled');
           if (!['preview', 'live'].includes(req.mode)) throw new Error('deploy request mode must be preview or live');
+          const lane = req.evidence_lane ?? 'commits';
+          if (!['commits', 'forum'].includes(lane)) throw new Error('evidence_lane must be commits or forum');
           if (req.base_sha !== process.env.PR_BASE_SHA) throw new Error(`deploy request base_sha ${req.base_sha} does not match PR base ${process.env.PR_BASE_SHA}`);
-          process.stdout.write(`mode=${req.mode}\n`);
+          process.stdout.write(`mode=${req.mode}\nlane=${lane}\n`);
           NODE
           elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
             node - <<'NODE' >> "$GITHUB_OUTPUT"
@@ -84,9 +94,11 @@ jobs:
           const req = JSON.parse(fs.readFileSync('.deploy/cloudflare-request.json', 'utf8'));
           if (req.enabled !== true) throw new Error('deploy request is not enabled');
           if (!['preview', 'live'].includes(req.mode)) throw new Error('deploy request mode must be preview or live');
+          const lane = req.evidence_lane ?? 'commits';
+          if (!['commits', 'forum'].includes(lane)) throw new Error('evidence_lane must be commits or forum');
           const parent = cp.execSync('git rev-parse HEAD^', { encoding: 'utf8' }).trim();
           if (req.base_sha !== parent) throw new Error(`deploy request base_sha ${req.base_sha} does not match parent ${parent}`);
-          process.stdout.write(`mode=${req.mode}\n`);
+          process.stdout.write(`mode=${req.mode}\nlane=${lane}\n`);
           NODE
           else
             if [ "${{ inputs.activate_notion_writes }}" = "true" ]; then
@@ -94,6 +106,7 @@ jobs:
             else
               echo "mode=preview" >> "$GITHUB_OUTPUT"
             fi
+            echo "lane=${{ inputs.evidence_lane }}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Fail closed on Cloudflare credentials
@@ -214,17 +227,18 @@ jobs:
           console.log(`health verified revision=${x.revision} mode=${x.mode}`);
           NODE
 
-      - name: Run controlled commits lane
+      - name: Run controlled evidence lane
         env:
           WORKER_URL: ${{ steps.worker.outputs.url }}
           EXPECTED_MODE: ${{ steps.request.outputs.mode }}
+          EVIDENCE_LANE: ${{ steps.request.outputs.lane }}
         shell: bash
         run: |
           set -euo pipefail
           rm -f lane.json
           STATUS=""
           for i in $(seq 1 12); do
-            STATUS="$(curl -sS -o lane.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/commits" || true)"
+            STATUS="$(curl -sS -o lane.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/${EVIDENCE_LANE}" || true)"
             if [ "$STATUS" = "200" ]; then break; fi
             if [ "$STATUS" = "401" ]; then sleep 5; continue; fi
             cat lane.json || true
@@ -236,15 +250,16 @@ jobs:
           node - <<'NODE'
           const fs = require('fs');
           const x = JSON.parse(fs.readFileSync('lane.json','utf8'));
-          if (x.lane !== 'commits') throw new Error(`unexpected lane ${x.lane}`);
+          if (x.lane !== process.env.EVIDENCE_LANE) throw new Error(`unexpected lane ${x.lane} != ${process.env.EVIDENCE_LANE}`);
           if (x.mode !== process.env.EXPECTED_MODE) throw new Error(`lane mode mismatch ${x.mode} != ${process.env.EXPECTED_MODE}`);
           if (!Number.isInteger(x.count) || x.count < 0) throw new Error('invalid count');
-          console.log(`lane verified count=${x.count} hasMore=${x.hasMore}`);
+          console.log(`lane verified lane=${x.lane} count=${x.count} hasMore=${x.hasMore}`);
           NODE
 
       - name: Read back D1 schema and runtime receipts
         if: ${{ always() && steps.d1.outputs.database_id != '' }}
         run: |
-          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_state','records','action_receipts') ORDER BY name" --config wrangler.generated.jsonc
-          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT lane, action, status, canonical_id, target, details, created_at FROM action_receipts ORDER BY created_at DESC LIMIT 30" --config wrangler.generated.jsonc
+          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_state','records','action_receipts','analysis_queue') ORDER BY name" --config wrangler.generated.jsonc
+          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT lane, action, status, canonical_id, target, details, created_at FROM action_receipts ORDER BY created_at DESC LIMIT 60" --config wrangler.generated.jsonc
           npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT kind, COUNT(*) AS records, SUM(CASE WHEN notion_page_id IS NOT NULL THEN 1 ELSE 0 END) AS notion_pages FROM records GROUP BY kind ORDER BY kind" --config wrangler.generated.jsonc
+          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT executor, kind, status, requires_human_review, COUNT(*) AS tasks FROM analysis_queue GROUP BY executor, kind, status, requires_human_review ORDER BY executor, kind, status" --config wrangler.generated.jsonc

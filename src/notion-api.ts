@@ -1,5 +1,5 @@
 import { assertAllowedNotionTarget, NOTION_TARGETS } from "./consent.js"
-import type { HypeSignal, ResearchSource } from "./domain/types.js"
+import type { ClaimCandidate, FollowUpPlan, HypeSignal, ResearchSource } from "./domain/types.js"
 
 const DEFAULT_NOTION_VERSION = "2025-09-03"
 const MIN_REQUEST_INTERVAL_MS = 350
@@ -93,12 +93,23 @@ function multiSelect(values: string[]): Json {
   return { multi_select: values.map((name) => ({ name })) }
 }
 
+function relation(pageIds: string[]): Json {
+  return { relation: pageIds.map((id) => ({ id })) }
+}
+
 async function findByRichText(token: string, dataSourceId: string, property: string, value: string): Promise<string | null> {
   assertAllowedNotionTarget(dataSourceId)
-  const body = {
-    filter: { property, rich_text: { equals: value } },
-    page_size: 1,
-  }
+  const body = { filter: { property, rich_text: { equals: value } }, page_size: 1 }
+  const result = await notionRequest<NotionListResponse>(token, `/v1/data_sources/${dataSourceId}/query`, {
+    method: "POST",
+    body: JSON.stringify(body),
+  })
+  return result.results?.[0]?.id ?? null
+}
+
+async function findByTitle(token: string, dataSourceId: string, property: string, value: string): Promise<string | null> {
+  assertAllowedNotionTarget(dataSourceId)
+  const body = { filter: { property, title: { equals: value } }, page_size: 1 }
   const result = await notionRequest<NotionListResponse>(token, `/v1/data_sources/${dataSourceId}/query`, {
     method: "POST",
     body: JSON.stringify(body),
@@ -122,15 +133,20 @@ async function updatePage(token: string, pageId: string, properties: Json): Prom
   })
 }
 
-function plainRichText(page: any, property: string): string {
-  const items = page?.properties?.[property]?.rich_text
-  if (!Array.isArray(items)) return ""
+function plainTextProperty(page: any, property: string): string {
+  const prop = page?.properties?.[property]
+  const items = Array.isArray(prop?.rich_text) ? prop.rich_text : Array.isArray(prop?.title) ? prop.title : []
   return items.map((item: any) => item?.plain_text ?? item?.text?.content ?? "").join("")
+}
+
+function selectedName(page: any, property: string): string {
+  return page?.properties?.[property]?.select?.name ?? ""
 }
 
 function sourceType(source: ResearchSource): string {
   if (source.sourceType === "Code-Commit" || source.sourceType === "Software-Release") return "Code oder Repository"
   if (source.sourceType === "Webarchiv-Capture") return "Website"
+  if (source.sourceType === "Forum-Post") return "Primärquelle"
   return source.primarySource ? "Primärquelle" : "Sonstiges"
 }
 
@@ -166,8 +182,8 @@ export async function upsertSourceToNotion(token: string, source: ResearchSource
   if (existing) await updatePage(token, pageId, initial)
 
   const readback = await notionRequest<any>(token, `/v1/pages/${pageId}`)
-  if (plainRichText(readback, "Kanonische ID") !== source.canonicalId) throw new Error(`Notion readback canonical ID mismatch: ${source.canonicalId}`)
-  if (plainRichText(readback, "Inhalts-Hash") !== source.recordSha256) throw new Error(`Notion readback hash mismatch: ${source.canonicalId}`)
+  if (plainTextProperty(readback, "Kanonische ID") !== source.canonicalId) throw new Error(`Notion readback canonical ID mismatch: ${source.canonicalId}`)
+  if (plainTextProperty(readback, "Inhalts-Hash") !== source.recordSha256) throw new Error(`Notion readback hash mismatch: ${source.canonicalId}`)
   await updatePage(token, pageId, { "Readback geprüft": checkbox(true) })
   return pageId
 }
@@ -199,8 +215,72 @@ export async function upsertSignalToNotion(token: string, signal: HypeSignal): P
   if (existing) await updatePage(token, pageId, initial)
 
   const readback = await notionRequest<any>(token, `/v1/pages/${pageId}`)
-  if (plainRichText(readback, "Signal-ID") !== signal.signalId) throw new Error(`Notion readback signal ID mismatch: ${signal.signalId}`)
-  if (plainRichText(readback, "Record SHA-256") !== signal.recordSha256) throw new Error(`Notion readback signal hash mismatch: ${signal.signalId}`)
+  if (plainTextProperty(readback, "Signal-ID") !== signal.signalId) throw new Error(`Notion readback signal ID mismatch: ${signal.signalId}`)
+  if (plainTextProperty(readback, "Record SHA-256") !== signal.recordSha256) throw new Error(`Notion readback signal hash mismatch: ${signal.signalId}`)
   await updatePage(token, pageId, { "Readback geprüft": checkbox(true) })
+  return pageId
+}
+
+function shortMarker(value: string): string {
+  const hashLike = value.match(/[a-f0-9]{12,}/i)?.[0]
+  const suffix = value.match(/:claim:(\d+)$/)?.[1]
+  return `${(hashLike ?? value).slice(0, 10)}${suffix ? `-${suffix}` : ""}`
+}
+
+export async function upsertClaimToNotion(token: string, claim: ClaimCandidate, sourcePageId: string): Promise<string> {
+  const target = NOTION_TARGETS.claims
+  const claimTitle = `[${shortMarker(claim.claimKey)}] ${claim.text}`.slice(0, 1900)
+  const properties: Json = {
+    Claim: title(claimTitle),
+    "Claim-Typ": select(claim.claimType),
+    Evidenzstufe: select("Behauptet"),
+    "Frühestes Datum": date(claim.sourcePublishedAt),
+    "Zuletzt geprüft": date(new Date().toISOString()),
+    Konfidenz: { number: claim.confidence },
+    "Offene Prüffrage": richText(claim.openQuestion),
+    "Primärevidenz vorhanden": checkbox(claim.primaryEvidenceAvailable),
+    Reproduzierbar: checkbox(false),
+    Status: select("Offen"),
+    "Unterstützende Evidenz": richText(`Automatisch extrahierter Claim-Kandidat aus ${claim.sourceCanonicalId}. Primärevidenz bezieht sich auf die Veröffentlichung des Statements, nicht automatisch auf dessen Wahrheitsgehalt.`),
+    "Widersprechende Evidenz": richText(""),
+    "Verbundene Archivquellen": relation([sourcePageId]),
+  }
+  const existing = await findByTitle(token, target, "Claim", claimTitle)
+  const pageId = existing ?? (await createPage(token, target, properties))
+  if (existing) await updatePage(token, pageId, properties)
+
+  const readback = await notionRequest<any>(token, `/v1/pages/${pageId}`)
+  if (plainTextProperty(readback, "Claim") !== claimTitle) throw new Error(`Notion claim readback mismatch: ${claim.claimKey}`)
+  if (selectedName(readback, "Status") !== "Offen") throw new Error(`Automatic claim escaped open status: ${claim.claimKey}`)
+  return pageId
+}
+
+export async function upsertFollowUpPlanToNotion(token: string, plan: FollowUpPlan): Promise<string> {
+  const target = NOTION_TARGETS.followups
+  const familyTitle = `[${shortMarker(plan.planKey)}] ${plan.title}`.slice(0, 1900)
+  const properties: Json = {
+    Informationsfamilie: title(familyTitle),
+    "Seed-URL": url(plan.seedUrl),
+    "Seed-Typ": select(plan.seedType),
+    Priorität: select(plan.priority),
+    Status: select("Offen"),
+    Fundlogik: richText(plan.discoveryLogic),
+    Verteilerlogik: richText(plan.distributionLogic),
+    Wahrheitsregel: richText(plan.truthRule),
+    "Pfad 1": richText(plan.paths[0]),
+    "Pfad 2": richText(plan.paths[1]),
+    "Pfad 3": richText(plan.paths[2]),
+    "Pfad 4": richText(plan.paths[3]),
+    "Pfad 5": richText(plan.paths[4]),
+    "Pfad 6": richText(plan.paths[5]),
+    "Letzter Lauf": date(plan.createdAt),
+  }
+  const existing = await findByTitle(token, target, "Informationsfamilie", familyTitle)
+  const pageId = existing ?? (await createPage(token, target, properties))
+  if (existing) await updatePage(token, pageId, properties)
+
+  const readback = await notionRequest<any>(token, `/v1/pages/${pageId}`)
+  if (plainTextProperty(readback, "Informationsfamilie") !== familyTitle) throw new Error(`Notion follow-up readback mismatch: ${plan.planKey}`)
+  if (selectedName(readback, "Status") !== "Offen") throw new Error(`Automatic follow-up escaped open status: ${plan.planKey}`)
   return pageId
 }
