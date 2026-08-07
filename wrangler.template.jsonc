@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "satoshi-bitcoin-research",
+  "main": "./src/index.ts",
+  "compatibility_date": "2026-08-07",
+  "workers_dev": true,
+  "observability": { "enabled": true },
+  "vars": {
+    "AUTONOMY_MODE": "__AUTONOMY_MODE__",
+    "REVISION": "__REVISION__"
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "satoshi-research",
+      "database_id": "__D1_DATABASE_ID__",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "triggers": {
+    "crons": [
+      "*/15 * * * *",
+      "7 * * * *",
+      "17 */6 * * *",
+      "*/30 * * * *"
+    ]
+  }
+}
