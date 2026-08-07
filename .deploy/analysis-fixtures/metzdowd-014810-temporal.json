@@ -1,0 +1,19 @@
+{
+  "fixtureVersion": "analysis-evidence-v1",
+  "taskId": "cryptography-mail:ebcb79fdc9b1d72321d79f564f1de65612a09483b016db17f610b45d7460ee24:analysis:temporal-analysis",
+  "executor": "wolfram",
+  "status": "done",
+  "resultSummary": "From the MetzDowd message timestamp 2008-10-31T18:10:00Z to Bitcoin block 0 timestamp 2009-01-03T18:15:05Z is 64 days, 0 hours, 5 minutes and 5 seconds. From the same message timestamp to the 2009-01-13T00:00:00Z SourceForge reference is 73 days, 5 hours and 50 minutes. These are temporal intervals only and provide no real-world identity inference.",
+  "method": "Wolfram Language DateDifference over UTC-normalized DateObject values. Bitcoin block 0 timestamp is obtained from BlockchainBlockData[0, \"Timestamp\", BlockchainBase -> \"Bitcoin\"].",
+  "reproducibleInput": "mail = DateObject[{2008,10,31,18,10,0}, \"Instant\", \"Gregorian\", 0]; genesis = BlockchainBlockData[0, \"Timestamp\", BlockchainBase -> \"Bitcoin\"]; sf = DateObject[{2009,1,13,0,0,0}, \"Instant\", \"Gregorian\", 0]; {DateDifference[mail, genesis, {\"Days\",\"Hours\",\"Minutes\",\"Seconds\"}], DateDifference[mail, sf, {\"Days\",\"Hours\",\"Minutes\",\"Seconds\"}]}",
+  "evidenceRefs": [
+    "https://www.metzdowd.com/pipermail/cryptography/2008-October/014810.html",
+    "bitcoin:block:0",
+    "sourceforge:2009-01-13"
+  ],
+  "expected": {
+    "mailToGenesis": "64 days, 0 hours, 5 minutes, 5 seconds",
+    "mailToSourceForgeReference": "73 days, 5 hours, 50 minutes, 0 seconds"
+  },
+  "truthBoundary": "Temporal evidence only. The archived sender attribution is not a cryptographic or real-world identity proof."
+}

@@ -92,8 +92,12 @@ jobs:
           const lane = req.evidence_lane ?? 'commits';
           const allowed = ['commits', 'forum', 'discovery', 'wayback', 'sourceforge', 'wikipedia', 'commoncrawl', 'mailinglist', 'feeds'];
           if (!allowed.includes(lane)) throw new Error(`evidence_lane must be one of ${allowed.join(', ')}`);
+          const fixture = req.analysis_fixture ?? '';
+          if (fixture && req.mode !== 'live') throw new Error('analysis_fixture is allowed only for live evidence runs');
+          if (fixture && !/^\.deploy\/analysis-fixtures\/[A-Za-z0-9._-]+\.json$/.test(fixture)) throw new Error('analysis_fixture path is not allowed');
+          if (fixture && !fs.existsSync(fixture)) throw new Error(`analysis_fixture does not exist: ${fixture}`);
           if (req.base_sha !== process.env.PR_BASE_SHA) throw new Error(`deploy request base_sha ${req.base_sha} does not match PR base ${process.env.PR_BASE_SHA}`);
-          process.stdout.write(`mode=${req.mode}\nlane=${lane}\n`);
+          process.stdout.write(`mode=${req.mode}\nlane=${lane}\nanalysis_fixture=${fixture}\n`);
           NODE
           elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
             node - <<'NODE' >> "$GITHUB_OUTPUT"
@@ -105,9 +109,13 @@ jobs:
           const lane = req.evidence_lane ?? 'commits';
           const allowed = ['commits', 'forum', 'discovery', 'wayback', 'sourceforge', 'wikipedia', 'commoncrawl', 'mailinglist', 'feeds'];
           if (!allowed.includes(lane)) throw new Error(`evidence_lane must be one of ${allowed.join(', ')}`);
+          const fixture = req.analysis_fixture ?? '';
+          if (fixture && req.mode !== 'live') throw new Error('analysis_fixture is allowed only for live evidence runs');
+          if (fixture && !/^\.deploy\/analysis-fixtures\/[A-Za-z0-9._-]+\.json$/.test(fixture)) throw new Error('analysis_fixture path is not allowed');
+          if (fixture && !fs.existsSync(fixture)) throw new Error(`analysis_fixture does not exist: ${fixture}`);
           const parent = cp.execSync('git rev-parse HEAD^', { encoding: 'utf8' }).trim();
           if (req.base_sha !== parent) throw new Error(`deploy request base_sha ${req.base_sha} does not match parent ${parent}`);
-          process.stdout.write(`mode=${req.mode}\nlane=${lane}\n`);
+          process.stdout.write(`mode=${req.mode}\nlane=${lane}\nanalysis_fixture=${fixture}\n`);
           NODE
           else
             if [ "${{ inputs.activate_notion_writes }}" = "true" ]; then
@@ -116,6 +124,7 @@ jobs:
               echo "mode=preview" >> "$GITHUB_OUTPUT"
             fi
             echo "lane=${{ inputs.evidence_lane }}" >> "$GITHUB_OUTPUT"
+            echo "analysis_fixture=" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Fail closed on Cloudflare credentials
@@ -221,6 +230,7 @@ jobs:
           if (x.ok !== true) process.exit(1);
           if (x.revision !== process.env.DEPLOY_REVISION) process.exit(1);
           if (x.mode !== process.env.EXPECTED_MODE) process.exit(1);
+          if (x.analysisResultRuntime?.queue !== true || x.analysisResultRuntime?.claims !== true || x.analysisResultRuntime?.results !== true) process.exit(1);
           NODE
               then
                 MATCHED=1
@@ -229,11 +239,11 @@ jobs:
             fi
             sleep 5
           done
-          test "$MATCHED" = "1" || { echo "Worker never converged to expected revision/mode" >&2; exit 1; }
+          test "$MATCHED" = "1" || { echo "Worker never converged to expected revision/mode/analysis readiness" >&2; exit 1; }
           node - <<'NODE'
           const fs = require('fs');
           const x = JSON.parse(fs.readFileSync('health.json','utf8'));
-          console.log(`health verified revision=${x.revision} mode=${x.mode}`);
+          console.log(`health verified revision=${x.revision} mode=${x.mode} analysis=${JSON.stringify(x.analysisResultRuntime)}`);
           NODE
 
       - name: Run controlled evidence lane
@@ -280,10 +290,21 @@ jobs:
           console.log(`lane verified lane=${x.lane} mode=${x.mode} count=${x.count} hasMore=${x.hasMore}`);
           NODE
 
+      - name: Run controlled analysis evidence fixture
+        if: ${{ steps.request.outputs.analysis_fixture != '' }}
+        env:
+          WORKER_URL: ${{ steps.worker.outputs.url }}
+          ANALYSIS_FIXTURE: ${{ steps.request.outputs.analysis_fixture }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --import tsx src/analysis-evidence-runner.ts "$ANALYSIS_FIXTURE"
+
       - name: Read back D1 schema and runtime receipts
         if: ${{ always() && steps.d1.outputs.database_id != '' }}
         run: |
-          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_state','records','action_receipts','analysis_queue') ORDER BY name" --config wrangler.generated.jsonc
-          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT lane, action, status, canonical_id, target, details, created_at FROM action_receipts ORDER BY created_at DESC LIMIT 60" --config wrangler.generated.jsonc
+          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_state','records','action_receipts','analysis_queue','analysis_claims','analysis_results') ORDER BY name" --config wrangler.generated.jsonc
+          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT lane, action, status, canonical_id, target, details, created_at FROM action_receipts ORDER BY created_at DESC LIMIT 80" --config wrangler.generated.jsonc
           npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT kind, COUNT(*) AS records, SUM(CASE WHEN notion_page_id IS NOT NULL THEN 1 ELSE 0 END) AS notion_pages FROM records GROUP BY kind ORDER BY kind" --config wrangler.generated.jsonc
           npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT executor, kind, status, requires_human_review, COUNT(*) AS tasks FROM analysis_queue GROUP BY executor, kind, status, requires_human_review ORDER BY executor, kind, status" --config wrangler.generated.jsonc
+          npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT task_id, executor, status, result_sha256, completed_at FROM analysis_results ORDER BY completed_at DESC LIMIT 20" --config wrangler.generated.jsonc
