@@ -29,13 +29,13 @@ export interface CommitPage {
   hasMore: boolean
 }
 
-function headers(): HeadersInit {
-  const token = process.env.GITHUB_TOKEN?.trim()
+function headers(token?: string): HeadersInit {
+  const normalized = token?.trim()
   return {
     Accept: "application/vnd.github+json",
     "User-Agent": "OuroborosCollective-Satoshi-Research-Worker",
     "X-GitHub-Api-Version": "2022-11-28",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(normalized ? { Authorization: `Bearer ${normalized}` } : {}),
   }
 }
 
@@ -44,15 +44,16 @@ export async function fetchBitcoinCoreCommits(input: {
   until: string
   page: number
   perPage?: number
+  token?: string
 }): Promise<CommitPage> {
   const url = new URL("https://api.github.com/repos/bitcoin/bitcoin/commits")
   url.searchParams.set("sha", "master")
   url.searchParams.set("since", input.since)
   url.searchParams.set("until", input.until)
   url.searchParams.set("page", String(input.page))
-  url.searchParams.set("per_page", String(input.perPage ?? 100))
+  url.searchParams.set("per_page", String(input.perPage ?? 25))
 
-  const response = await fetch(url, { headers: headers() })
+  const response = await fetch(url, { headers: headers(input.token) })
   if (!response.ok) throw new Error(`GitHub commits request failed: ${response.status}`)
   const commits = (await response.json()) as GitHubCommit[]
   return {
@@ -61,10 +62,10 @@ export async function fetchBitcoinCoreCommits(input: {
   }
 }
 
-export async function fetchBitcoinCoreReleases(): Promise<GitHubRelease[]> {
+export async function fetchBitcoinCoreReleases(token?: string): Promise<GitHubRelease[]> {
   const response = await fetch(
-    "https://api.github.com/repos/bitcoin/bitcoin/releases?per_page=30",
-    { headers: headers() }
+    "https://api.github.com/repos/bitcoin/bitcoin/releases?per_page=20",
+    { headers: headers(token) }
   )
   if (!response.ok) throw new Error(`GitHub releases request failed: ${response.status}`)
   return (await response.json()) as GitHubRelease[]
