@@ -1,6 +1,7 @@
 {
   "enabled": true,
-  "mode": "live",
-  "base_sha": "b9fd4a6a4f1cc9c3416e8bcb705ee7e73a9f0dda",
-  "reason": "First live free-runtime evidence run after successful preview, with Notion pacing, Retry-After handling and bounded commit batch"
+  "mode": "preview",
+  "base_sha": "b124addc5e6d2d90819b3f0594d09386ae639d76",
+  "evidence_lane": "mailinglist",
+  "reason": "Second revision-bound preview of original MetzDowd lane after real Pipermail sender parser fix; no Notion writes"
 }
