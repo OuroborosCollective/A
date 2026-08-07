@@ -1,4 +1,4 @@
-import { handleFetch, scheduled, type Env, type ScheduledLike } from "./runtime.js"
+import { handleFetch, scheduled, type Env, type ScheduledLike } from "./runtime-mailinglist-extension.js"
 
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
