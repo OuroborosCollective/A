@@ -17,6 +17,11 @@ export interface D1Database {
   prepare(query: string): D1PreparedStatement
 }
 
+export interface RecordMeta {
+  recordSha256: string
+  notionPageId?: string
+}
+
 export async function getState<T>(db: D1Database, lane: string): Promise<T | undefined> {
   const row = await db.prepare("SELECT state_json FROM sync_state WHERE lane = ?").bind(lane).first<{ state_json: string }>()
   if (!row?.state_json) return undefined
@@ -27,6 +32,24 @@ export async function putState(db: D1Database, lane: string, state: unknown): Pr
   await db.prepare(
     "INSERT INTO sync_state(lane, state_json, updated_at) VALUES(?, ?, ?) ON CONFLICT(lane) DO UPDATE SET state_json=excluded.state_json, updated_at=excluded.updated_at"
   ).bind(lane, JSON.stringify(state), new Date().toISOString()).run()
+}
+
+export async function getRecordMeta(db: D1Database, id: string): Promise<RecordMeta | undefined> {
+  const row = await db.prepare(
+    "SELECT record_sha256, notion_page_id FROM records WHERE canonical_id = ?"
+  ).bind(id).first<{ record_sha256: string; notion_page_id: string | null }>()
+  if (!row?.record_sha256) return undefined
+  return {
+    recordSha256: row.record_sha256,
+    notionPageId: row.notion_page_id ?? undefined,
+  }
+}
+
+export async function hasSuccessfulReceipt(db: D1Database, action: string, canonicalId: string): Promise<boolean> {
+  const row = await db.prepare(
+    "SELECT 1 AS ok FROM action_receipts WHERE action = ? AND canonical_id = ? AND status = 'success' LIMIT 1"
+  ).bind(action, canonicalId).first<{ ok: number }>()
+  return row?.ok === 1
 }
 
 export async function rememberRecord(

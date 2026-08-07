@@ -236,24 +236,39 @@ jobs:
         run: |
           set -euo pipefail
           rm -f lane.json
+          MATCHED=0
           STATUS=""
           for i in $(seq 1 12); do
             STATUS="$(curl -sS -o lane.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/${EVIDENCE_LANE}" || true)"
-            if [ "$STATUS" = "200" ]; then break; fi
-            if [ "$STATUS" = "401" ]; then sleep 5; continue; fi
-            cat lane.json || true
-            echo "Unexpected controlled-lane HTTP status: $STATUS" >&2
-            exit 1
+            if [ "$STATUS" = "401" ]; then
+              sleep 5
+              continue
+            fi
+            if [ "$STATUS" != "200" ]; then
+              cat lane.json || true
+              echo "Unexpected controlled-lane HTTP status: $STATUS" >&2
+              exit 1
+            fi
+            cat lane.json
+            if node - <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('lane.json','utf8'));
+          if (x.lane !== process.env.EVIDENCE_LANE) process.exit(1);
+          if (x.mode !== process.env.EXPECTED_MODE) process.exit(1);
+          if (!Number.isInteger(x.count) || x.count < 0) process.exit(1);
+          NODE
+            then
+              MATCHED=1
+              break
+            fi
+            echo "Controlled lane has not converged to expected mode yet; retrying" >&2
+            sleep 5
           done
-          test "$STATUS" = "200" || { cat lane.json || true; echo "Controlled lane never observed propagated ADMIN_TOKEN" >&2; exit 1; }
-          cat lane.json
+          test "$MATCHED" = "1" || { cat lane.json || true; echo "Controlled lane never converged to expected mode" >&2; exit 1; }
           node - <<'NODE'
           const fs = require('fs');
           const x = JSON.parse(fs.readFileSync('lane.json','utf8'));
-          if (x.lane !== process.env.EVIDENCE_LANE) throw new Error(`unexpected lane ${x.lane} != ${process.env.EVIDENCE_LANE}`);
-          if (x.mode !== process.env.EXPECTED_MODE) throw new Error(`lane mode mismatch ${x.mode} != ${process.env.EXPECTED_MODE}`);
-          if (!Number.isInteger(x.count) || x.count < 0) throw new Error('invalid count');
-          console.log(`lane verified lane=${x.lane} count=${x.count} hasMore=${x.hasMore}`);
+          console.log(`lane verified lane=${x.lane} mode=${x.mode} count=${x.count} hasMore=${x.hasMore}`);
           NODE
 
       - name: Read back D1 schema and runtime receipts
