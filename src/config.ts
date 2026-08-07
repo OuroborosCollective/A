@@ -45,30 +45,21 @@ export const WAYBACK_SEEDS = [
   BITCOINTALK.historicalPostsUrl,
 ] as const
 
+// Direct SourceForge collection is intentionally limited to small, specific REST
+// records. Project-root, Files and SVN/Code pages remain covered by Wayback and
+// Common Crawl to stay within the Cloudflare Free CPU/subrequest budget.
 export const SOURCEFORGE_SEEDS: SourceForgeSeed[] = [
   {
-    apiUrl: "https://sourceforge.net/rest/p/bitcoin",
-    publicUrl: "https://sourceforge.net/projects/bitcoin/",
-    kind: "project",
-    title: "Bitcoin SourceForge project",
-  },
-  {
-    apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash",
+    apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
     publicUrl: "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
     kind: "news",
     title: "Bitcoin v0.1 released - P2P e-cash",
   },
   {
-    apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2011/01/development-process",
+    apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2011/01/development-process/",
     publicUrl: "https://sourceforge.net/p/bitcoin/news/2011/01/development-process/",
     kind: "news",
     title: "Development process",
-  },
-  {
-    apiUrl: "https://sourceforge.net/rest/p/bitcoin/code",
-    publicUrl: "https://sourceforge.net/p/bitcoin/code/HEAD/tree/",
-    kind: "code",
-    title: "Bitcoin historical SourceForge code repository",
   },
 ]
 
