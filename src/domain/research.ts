@@ -164,6 +164,7 @@ export function deriveFollowUpPlan(source: ResearchSource, claims: ClaimCandidat
   const isForum = source.lane === "Satoshi Forum" || source.lane === "Forum Claims"
   const isDeepResearch = isForum || source.subjects.some((subject) => ["Satoshi", "Identität", "Kryptografie"].includes(subject))
   if (!isDeepResearch) return null
+  const createdAt = source.retrievedAt
 
   const generic = deriveResearchPaths({ title: source.title, sourceType: source.sourceType, url: source.originalUrl })
   const forumPaths = isForum ? [
