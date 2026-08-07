@@ -85,11 +85,14 @@ export const COMMON_CRAWL_SEEDS = [
   "sourceforge.net/projects/bitcoin/*",
 ] as const
 
-export const HISTORICAL_DISCOVERY_PROVIDERS = [
+// Kept as a runtime-extensible string list because protected/manual provider lanes
+// still exist, while the automatic free-tier rotation intentionally contains only
+// providers that have passed Cloudflare runtime preview evidence.
+export const HISTORICAL_DISCOVERY_PROVIDERS: readonly string[] = [
   "wayback",
   "wikipedia",
   "commoncrawl",
-] as const
+]
 
 export const FEEDS: FeedDefinition[] = [
   {
