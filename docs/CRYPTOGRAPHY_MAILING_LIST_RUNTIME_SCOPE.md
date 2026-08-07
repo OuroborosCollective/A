@@ -1,0 +1,1 @@
+Runtime-scope marker for the post-#91 mailing-list integration. This file exists only as ordinary documentation; deployment remains gated by CI and the separate evidence PR process.
