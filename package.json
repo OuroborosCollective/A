@@ -7,7 +7,7 @@
   "scripts": {
     "build": "tsc",
     "check": "tsc --project tsconfig.test.json",
-    "test": "node --import tsx --test test.ts cryptography-mailing-list.test.ts feed-budget-extension.test.ts",
+    "test": "node --import tsx --test test.ts cryptography-mailing-list.test.ts feed-budget-extension.test.ts analysis-runtime.test.ts",
     "verify": "npm run check && npm test",
     "cf:deploy": "wrangler deploy --config wrangler.generated.jsonc"
   },
