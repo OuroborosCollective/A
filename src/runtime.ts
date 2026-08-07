@@ -20,7 +20,9 @@ import {
 } from "./notion-api.js"
 import {
   addReceipt,
+  getRecordMeta,
   getState,
+  hasSuccessfulReceipt,
   listPendingAnalysisTasks,
   putState,
   queueAnalysisTask,
@@ -63,6 +65,21 @@ function deepResearchEligible(source: ResearchSource): boolean {
     || source.subjects.includes("Kryptografie")
 }
 
+async function queueTasks(env: Env, lane: Lane, runId: string, tasks: AnalysisTask[]): Promise<void> {
+  for (const task of tasks) {
+    await queueAnalysisTask(env.DB, task)
+    await addReceipt(env.DB, {
+      runId,
+      lane,
+      action: "analysis-queued",
+      canonicalId: task.taskId,
+      target: "d1-analysis-queue",
+      status: "success",
+      details: `${task.executor}:${task.kind};human_review=${task.requiresHumanReview}`,
+    })
+  }
+}
+
 async function persistResearchArtifacts(
   env: Env,
   lane: Lane,
@@ -89,8 +106,22 @@ async function persistResearchArtifacts(
   }
 
   if (!sourcePageId) throw new Error(`Live research artifacts require source page readback: ${source.canonicalId}`)
-  const token = requireNotionToken(env)
 
+  if (plan && await hasSuccessfulReceipt(env.DB, "follow-up-readback", plan.planKey)) {
+    await queueTasks(env, lane, runId, tasks)
+    await addReceipt(env.DB, {
+      runId,
+      lane,
+      action: "research-artifacts-reused",
+      canonicalId: source.canonicalId,
+      target: NOTION_TARGETS.followups,
+      status: "success",
+      details: "Existing successful claim/follow-up readback reused; D1 analysis tasks refreshed idempotently",
+    })
+    return
+  }
+
+  const token = requireNotionToken(env)
   for (const claim of claims) {
     const claimPageId = await upsertClaimToNotion(token, claim, sourcePageId)
     await addReceipt(env.DB, {
@@ -117,18 +148,7 @@ async function persistResearchArtifacts(
     })
   }
 
-  for (const task of tasks) {
-    await queueAnalysisTask(env.DB, task)
-    await addReceipt(env.DB, {
-      runId,
-      lane,
-      action: "analysis-queued",
-      canonicalId: task.taskId,
-      target: "d1-analysis-queue",
-      status: "success",
-      details: `${task.executor}:${task.kind};human_review=${task.requiresHumanReview}`,
-    })
-  }
+  await queueTasks(env, lane, runId, tasks)
 }
 
 async function persistSources(env: Env, lane: Lane, runId: string, records: ResearchSource[]): Promise<void> {
@@ -136,15 +156,31 @@ async function persistSources(env: Env, lane: Lane, runId: string, records: Rese
   let failures = 0
   for (const record of records) {
     try {
+      const existing = await getRecordMeta(env.DB, record.canonicalId)
       await rememberRecord(env.DB, record.canonicalId, "source", record.recordSha256, record)
       if (currentMode === "preview") {
         await addReceipt(env.DB, { runId, lane, action: "notion-upsert", canonicalId: record.canonicalId, target: NOTION_TARGETS.sources, status: "preview" })
         await persistResearchArtifacts(env, lane, runId, record)
         continue
       }
-      const pageId = await upsertSourceToNotion(requireNotionToken(env), record)
-      await rememberRecord(env.DB, record.canonicalId, "source", record.recordSha256, record, pageId)
-      await addReceipt(env.DB, { runId, lane, action: "notion-upsert-readback", canonicalId: record.canonicalId, target: NOTION_TARGETS.sources, status: "success", details: `page=${pageId}` })
+
+      let pageId: string
+      if (existing?.recordSha256 === record.recordSha256 && existing.notionPageId) {
+        pageId = existing.notionPageId
+        await addReceipt(env.DB, {
+          runId,
+          lane,
+          action: "notion-source-reused",
+          canonicalId: record.canonicalId,
+          target: NOTION_TARGETS.sources,
+          status: "success",
+          details: `page=${pageId};unchanged_hash=true`,
+        })
+      } else {
+        pageId = await upsertSourceToNotion(requireNotionToken(env), record)
+        await rememberRecord(env.DB, record.canonicalId, "source", record.recordSha256, record, pageId)
+        await addReceipt(env.DB, { runId, lane, action: "notion-upsert-readback", canonicalId: record.canonicalId, target: NOTION_TARGETS.sources, status: "success", details: `page=${pageId}` })
+      }
       await persistResearchArtifacts(env, lane, runId, record, pageId)
     } catch (error) {
       failures += 1
