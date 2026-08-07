@@ -14,6 +14,8 @@ export interface SourceForgePage {
   kind: SourceForgeSeed["kind"]
 }
 
+const SOURCEFORGE_MAX_RESPONSE_BYTES = 128 * 1024
+
 function compact(value: unknown, max = 5000): string {
   const text = typeof value === "string" ? value : JSON.stringify(value)
   return (text ?? "").replace(/\s+/g, " ").trim().slice(0, max)
@@ -62,6 +64,35 @@ function boundedPayload(payload: Record<string, unknown>): Record<string, unknow
   return result
 }
 
+async function readBoundedResponse(response: Response, maxBytes = SOURCEFORGE_MAX_RESPONSE_BYTES): Promise<string> {
+  const declared = Number(response.headers.get("content-length") ?? "0")
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error(`SourceForge REST payload too large: ${declared} bytes`)
+  }
+  if (!response.body) return ""
+
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let total = 0
+  let output = ""
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      total += value.byteLength
+      if (total > maxBytes) {
+        await reader.cancel("SourceForge REST payload exceeded bounded runtime budget")
+        throw new Error(`SourceForge REST payload exceeded ${maxBytes} bytes`)
+      }
+      output += decoder.decode(value, { stream: true })
+    }
+    output += decoder.decode()
+    return output
+  } finally {
+    reader.releaseLock()
+  }
+}
+
 export function parseSourceForgeRest(payload: unknown, seed: SourceForgeSeed): SourceForgePage {
   if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error(`Unexpected SourceForge REST payload for ${seed.apiUrl}`)
@@ -85,11 +116,14 @@ export async function fetchSourceForgePage(seed: SourceForgeSeed): Promise<Sourc
     },
   })
   if (!response.ok) throw new Error(`SourceForge REST request failed: ${response.status}`)
-  const lengthHeader = Number(response.headers.get("content-length") ?? "0")
-  if (Number.isFinite(lengthHeader) && lengthHeader > 1_000_000) {
-    throw new Error(`SourceForge REST payload too large: ${lengthHeader}`)
+  const body = await readBoundedResponse(response)
+  let payload: unknown
+  try {
+    payload = JSON.parse(body)
+  } catch {
+    throw new Error(`SourceForge REST returned non-JSON payload for ${seed.apiUrl}`)
   }
-  return parseSourceForgeRest(await response.json(), seed)
+  return parseSourceForgeRest(payload, seed)
 }
 
 // Legacy/test-only HTML parser. The production collector above never calls this path.
