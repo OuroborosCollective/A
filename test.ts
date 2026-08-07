@@ -17,6 +17,7 @@ import type { ResearchSource } from "./src/domain/types.js"
 import { waybackTimestampToIso } from "./src/adapters/wayback.js"
 import { assertAllowedNotionTarget, NOTION_TARGETS, STANDING_AUTHORITY } from "./src/consent.js"
 import { laneForCron } from "./src/runtime.js"
+import { FORUM_HISTORICAL_BATCH, FORUM_MAX_RECORDS_PER_RUN, FORUM_RECENT_CLAIM_BATCH } from "./src/sync.js"
 
 test("canonicalizeUrl removes tracking data and sorts retained parameters", () => {
   assert.equal(
@@ -208,6 +209,12 @@ test("forum claims stay open and identity analysis requires human review", () =>
   const plan = deriveFollowUpPlan(source, claims, tasks)
   assert.equal(plan?.status, "Offen")
   assert.equal(plan?.paths.length, 6)
+})
+
+test("forum lane stays at two records per invocation for free-worker subrequest safety", () => {
+  assert.equal(FORUM_HISTORICAL_BATCH, 1)
+  assert.equal(FORUM_RECENT_CLAIM_BATCH, 1)
+  assert.equal(FORUM_MAX_RECORDS_PER_RUN, 2)
 })
 
 test("standing authority permits only four bounded research data sources", () => {
