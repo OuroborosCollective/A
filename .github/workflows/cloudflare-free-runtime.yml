@@ -211,7 +211,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          curl -fsS -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/commits" -o lane.json
+          rm -f lane.json
+          STATUS=""
+          for i in $(seq 1 12); do
+            STATUS="$(curl -sS -o lane.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/commits" || true)"
+            if [ "$STATUS" = "200" ]; then break; fi
+            if [ "$STATUS" = "401" ]; then sleep 5; continue; fi
+            cat lane.json || true
+            echo "Unexpected controlled-lane HTTP status: $STATUS" >&2
+            exit 1
+          done
+          test "$STATUS" = "200" || { cat lane.json || true; echo "Controlled lane never observed propagated ADMIN_TOKEN" >&2; exit 1; }
           cat lane.json
           node - <<'NODE'
           const fs = require('fs');
@@ -223,6 +233,7 @@ jobs:
           NODE
 
       - name: Read back D1 schema and runtime receipts
+        if: ${{ always() && steps.d1.outputs.database_id != '' }}
         run: |
           npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('sync_state','records','action_receipts') ORDER BY name" --config wrangler.generated.jsonc
           npx wrangler@4.114.0 d1 execute satoshi-research --remote --command="SELECT lane, action, status, canonical_id, target, details, created_at FROM action_receipts ORDER BY created_at DESC LIMIT 30" --config wrangler.generated.jsonc
