@@ -1,6 +1,7 @@
 {
   "enabled": true,
-  "mode": "live",
-  "base_sha": "b9fd4a6a4f1cc9c3416e8bcb705ee7e73a9f0dda",
-  "reason": "First live free-runtime evidence run after successful preview, with Notion pacing, Retry-After handling and bounded commit batch"
+  "mode": "preview",
+  "base_sha": "998378ec8586e09346c445a1354a3488bcf6be14",
+  "evidence_lane": "forum",
+  "reason": "Preview merged semantic showPosts parser against live Bitcointalk before any forum Notion writes"
 }
