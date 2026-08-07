@@ -6,6 +6,8 @@ import { canonicalSourceId, canonicalizeUrl } from "./src/domain/canonical.js"
 import { sha256Hex, stableJson } from "./src/domain/hash.js"
 import { assessEvidence, calculateHype, deriveResearchPaths } from "./src/domain/research.js"
 import { waybackTimestampToIso } from "./src/adapters/wayback.js"
+import { assertAllowedNotionTarget, NOTION_TARGETS } from "./src/consent.js"
+import { laneForCron } from "./src/runtime.js"
 
 test("canonicalizeUrl removes tracking data and sorts retained parameters", () => {
   assert.equal(
@@ -94,4 +96,18 @@ test("parseFeed accepts RSS and Atom", () => {
 
 test("Wayback timestamp becomes ISO UTC", () => {
   assert.equal(waybackTimestampToIso("20090103184505"), "2009-01-03T18:45:05Z")
+})
+
+test("standing authority only permits the two research data sources", () => {
+  assert.doesNotThrow(() => assertAllowedNotionTarget(NOTION_TARGETS.sources))
+  assert.doesNotThrow(() => assertAllowedNotionTarget(NOTION_TARGETS.hype))
+  assert.throws(() => assertAllowedNotionTarget("00000000-0000-0000-0000-000000000000"), /Consent boundary rejected/)
+})
+
+test("cron triggers map deterministically to bounded lanes", () => {
+  assert.equal(laneForCron("*/15 * * * *"), "commits")
+  assert.equal(laneForCron("7 * * * *"), "releases")
+  assert.equal(laneForCron("17 */6 * * *"), "wayback")
+  assert.equal(laneForCron("*/30 * * * *"), "feeds")
+  assert.equal(laneForCron("* * * * *"), null)
 })
