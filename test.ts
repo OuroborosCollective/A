@@ -128,6 +128,33 @@ test("Bitcointalk parser attributes u=3 post without quoted text", () => {
   assert.doesNotMatch(posts[0]?.body ?? "", /must not be attributed/)
 })
 
+test("Bitcointalk parser accepts legacy showPosts table rows", () => {
+  const html = `
+    <table>
+      <tr class="catbg">
+        <td colspan="2" align="left" class="smalltext">
+          <div style="float: right;">Posted on: July 25, 2010, 10:06:57 PM</div>
+          Posted by: satoshi
+        </td>
+      </tr>
+      <tr class="windowbg2">
+        <td class="smalltext" id="msg12345">
+          <div align="right" onclick="return insertQuoteFast(12345);">Insert Quote</div>
+          <div class="post">For future reference, here is my public key. Check the fingerprint and signatures independently.</div>
+        </td>
+      </tr>
+    </table>
+    <a href="https://bitcointalk.org/index.php?action=profile;u=3;sa=showPosts;start=10">next</a>
+  `
+  const posts = parseBitcointalkPosts(html, { author: "satoshi", authorId: "3" })
+  assert.equal(posts.length, 1)
+  assert.equal(posts[0]?.messageId, "12345")
+  assert.equal(posts[0]?.authorId, "3")
+  assert.equal(posts[0]?.isSatoshiAccount, true)
+  assert.match(posts[0]?.body ?? "", /public key/)
+  assert.match(posts[0]?.url ?? "", /\?msg=12345$/)
+})
+
 function forumSource(summary: string): ResearchSource {
   return {
     canonicalId: "bitcointalk-message:0123456789abcdef",
