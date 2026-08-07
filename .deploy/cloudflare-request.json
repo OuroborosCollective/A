@@ -1,6 +1,7 @@
 {
   "enabled": true,
   "mode": "live",
-  "base_sha": "b9fd4a6a4f1cc9c3416e8bcb705ee7e73a9f0dda",
-  "reason": "First live free-runtime evidence run after successful preview, with Notion pacing, Retry-After handling and bounded commit batch"
+  "base_sha": "a9801bcc5251d233d0bfd1646c0ed431db7d822a",
+  "evidence_lane": "feeds",
+  "reason": "Live evidence for merged analysis result runtime; restore exact merged code to live and prove D1 readiness plus bounded feed regression"
 }
