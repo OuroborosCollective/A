@@ -13,6 +13,8 @@ export type SourceLane =
   | "Historische Webarchive"
   | "Technische Berichte"
   | "Medien und Hype"
+  | "Satoshi Forum"
+  | "Forum Claims"
 
 export interface ResearchSource {
   canonicalId: string
@@ -50,4 +52,63 @@ export interface HypeSignal {
   evidenceGap: boolean
   recordSha256: string
   adapter: string
+}
+
+export type ClaimType =
+  | "Identität"
+  | "Technik"
+  | "Chronologie"
+  | "Autorschaft"
+  | "Eigentum"
+  | "Beziehung"
+  | "Ort"
+  | "Medienbehauptung"
+  | "Sonstiges"
+
+export interface ClaimCandidate {
+  claimKey: string
+  text: string
+  claimType: ClaimType
+  evidenceTier: "Behauptet"
+  sourceCanonicalId: string
+  sourceUrl: string
+  sourcePublishedAt?: string
+  primaryEvidenceAvailable: boolean
+  confidence: number
+  openQuestion: string
+}
+
+export type AnalysisKind =
+  | "source-triangulation"
+  | "temporal-analysis"
+  | "cryptographic-statistics"
+  | "network-graph"
+  | "quantitative-analysis"
+  | "stylometry"
+
+export interface AnalysisTask {
+  taskId: string
+  sourceCanonicalId: string
+  kind: AnalysisKind
+  executor: "research" | "wolfram"
+  status: "pending"
+  requiresHumanReview: boolean
+  rationale: string
+  inputSummary: string
+  sourceUrl: string
+  createdAt: string
+}
+
+export interface FollowUpPlan {
+  planKey: string
+  title: string
+  seedUrl: string
+  seedType: "Forum" | "Primärdokument" | "Webarchiv" | "Code" | "Medien" | "Sammlung"
+  priority: "A" | "B" | "C" | "D" | "E"
+  status: "Offen"
+  discoveryLogic: string
+  distributionLogic: string
+  truthRule: string
+  paths: [string, string, string, string, string, string]
+  createdAt: string
 }
