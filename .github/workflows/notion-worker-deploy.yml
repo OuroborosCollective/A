@@ -1,0 +1,83 @@
+name: Notion Worker Deploy + Readback
+
+on:
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy the worker after verification"
+        required: true
+        default: false
+        type: boolean
+      trigger_live_syncs:
+        description: "Trigger selected syncs after deployment (writes to managed Notion databases)"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: notion-worker-production
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install dependencies
+        run: npm install --ignore-scripts
+      - name: Typecheck and test
+        run: npm run verify
+
+  deploy-and-readback:
+    if: ${{ inputs.deploy }}
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: notion-production
+    env:
+      NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+      NOTION_WORKSPACE_ID: ${{ secrets.NOTION_WORKSPACE_ID }}
+      NOTION_KEYRING: "0"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Fail closed when Notion credentials are absent
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${NOTION_API_TOKEN:-}" || { echo "NOTION_API_TOKEN is not configured" >&2; exit 1; }
+          test -n "${NOTION_WORKSPACE_ID:-}" || { echo "NOTION_WORKSPACE_ID is not configured" >&2; exit 1; }
+      - name: Install project and official Notion CLI
+        run: |
+          npm install --ignore-scripts
+          npm install --global ntn
+      - name: Re-run verification on deployment runner
+        run: npm run verify
+      - name: Deploy exact checked-out revision
+        run: ntn workers deploy --name satoshi-bitcoin-research
+      - name: Read back deployed capabilities
+        run: ntn workers capabilities list
+      - name: Preview primary source syncs without writing
+        run: |
+          ntn workers sync trigger bitcoinCoreCommits --preview
+          ntn workers sync trigger bitcoinCoreReleases --preview
+          ntn workers sync trigger historicalWaybackCaptures --preview
+      - name: Preview hype sync without writing
+        run: ntn workers sync trigger bitcoinHypeFeeds --preview
+      - name: Read back sync status
+        run: ntn workers sync status
+      - name: Trigger live syncs
+        if: ${{ inputs.trigger_live_syncs }}
+        run: |
+          ntn workers sync trigger bitcoinCoreCommits
+          ntn workers sync trigger bitcoinCoreReleases
+          ntn workers sync trigger historicalWaybackCaptures
+          ntn workers sync trigger bitcoinHypeFeeds
+          ntn workers sync status
