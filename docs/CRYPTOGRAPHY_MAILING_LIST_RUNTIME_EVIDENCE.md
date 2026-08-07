@@ -1,0 +1,1 @@
+Evidence acceptance criteria: exact revision health, `mailinglist` controlled-lane success, one-record bounded batch, D1 receipt readback, and independent Notion verification before production-green is claimed.
