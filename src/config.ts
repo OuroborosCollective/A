@@ -94,7 +94,11 @@ export const COMMON_CRAWL_SEEDS = [
   "www.metzdowd.com/pipermail/cryptography/*",
 ] as const
 
-export const HISTORICAL_DISCOVERY_PROVIDERS: readonly string[] = ["wayback", "mailinglist", "wikipedia", "commoncrawl"]
+// The direct mailing-list adapter is staged and tested first. Until its own runtime
+// lane is wired and previewed, production historical discovery remains on providers
+// already proven on Cloudflare Free. Mailing-list URLs are still automatically
+// archived through Wayback and Common Crawl in this phase.
+export const HISTORICAL_DISCOVERY_PROVIDERS: readonly string[] = ["wayback", "wikipedia", "commoncrawl"]
 
 export const FEEDS: FeedDefinition[] = [
   { id: "bitcoin-core-releases", title: "Bitcoin Core releases", url: "https://github.com/bitcoin/bitcoin/releases.atom", sourceClass: "technical", weight: 0.35 },
