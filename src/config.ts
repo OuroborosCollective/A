@@ -1,3 +1,4 @@
+import type { SourceForgeSeed } from "./adapters/sourceforge.js"
 import type { WikipediaSeed } from "./adapters/wikipedia.js"
 
 export interface FeedDefinition {
@@ -39,18 +40,37 @@ export const WAYBACK_SEEDS = [
   "https://sourceforge.net/p/bitcoin/news/",
   "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
   "https://sourceforge.net/p/bitcoin/code/HEAD/tree/",
+  "https://sourceforge.net/projects/bitcoin/files/",
   BITCOINTALK.historicalProfileUrl,
   BITCOINTALK.historicalPostsUrl,
 ] as const
 
-export const SOURCEFORGE_SEEDS = [
-  "https://sourceforge.net/projects/bitcoin/",
-  "https://sourceforge.net/p/bitcoin/news/",
-  "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
-  "https://sourceforge.net/p/bitcoin/news/2011/01/development-process/",
-  "https://sourceforge.net/p/bitcoin/code/HEAD/tree/",
-  "https://sourceforge.net/projects/bitcoin/files/",
-] as const
+export const SOURCEFORGE_SEEDS: SourceForgeSeed[] = [
+  {
+    apiUrl: "https://sourceforge.net/rest/p/bitcoin",
+    publicUrl: "https://sourceforge.net/projects/bitcoin/",
+    kind: "project",
+    title: "Bitcoin SourceForge project",
+  },
+  {
+    apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash",
+    publicUrl: "https://sourceforge.net/p/bitcoin/news/2009/01/bitcoin-v01-released---p2p-e-cash/",
+    kind: "news",
+    title: "Bitcoin v0.1 released - P2P e-cash",
+  },
+  {
+    apiUrl: "https://sourceforge.net/rest/p/bitcoin/news/2011/01/development-process",
+    publicUrl: "https://sourceforge.net/p/bitcoin/news/2011/01/development-process/",
+    kind: "news",
+    title: "Development process",
+  },
+  {
+    apiUrl: "https://sourceforge.net/rest/p/bitcoin/code",
+    publicUrl: "https://sourceforge.net/p/bitcoin/code/HEAD/tree/",
+    kind: "code",
+    title: "Bitcoin historical SourceForge code repository",
+  },
+]
 
 export const WIKIPEDIA_SEEDS: WikipediaSeed[] = [
   { language: "en", title: "Bitcoin" },
