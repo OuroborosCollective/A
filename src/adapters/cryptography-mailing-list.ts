@@ -57,32 +57,31 @@ function isoDate(raw: string): string | undefined {
 }
 
 function normalizeObfuscatedEmail(value: string): string {
-  const decoded = decodeURIComponent(decodeHtml(value)).trim()
+  let decoded = decodeHtml(value).trim()
+  try { decoded = decodeURIComponent(decoded) } catch { /* retain original text */ }
   const direct = decoded.match(/([A-Za-z0-9._%+-]+)\s*(?:@|\bat\b)\s*([A-Za-z0-9.-]+\.[A-Za-z]{2,})/i)
   return direct ? `${direct[1]}@${direct[2]}` : ""
 }
 
 function extractSender(html: string, headerText: string): { author: string; email: string } {
   const headerHtml = html.slice(0, Math.min(html.length, 12_000))
-
-  // Pipermail commonly renders the sender as a bold author immediately before
-  // an obfuscated mailto anchor. Prefer this structural relationship over line
-  // breaks because historical pages vary in whitespace and HTML formatting.
-  const anchored = headerHtml.match(/<b[^>]*>([\s\S]{1,300}?)<\/b>\s*(?:<a[^>]*href=["']mailto:([^"']+)["'][^>]*>([\s\S]{1,300}?)<\/a>)/i)
-  if (anchored) {
-    const author = textOnly(anchored[1] ?? "").trim()
-    const visible = textOnly(anchored[3] ?? "")
-    const email = normalizeObfuscatedEmail(visible) || normalizeObfuscatedEmail(anchored[2] ?? "")
+  const mailAnchor = /<a\b[^>]*href=["']mailto:([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i.exec(headerHtml)
+  if (mailAnchor && typeof mailAnchor.index === "number") {
+    const before = headerHtml.slice(0, mailAnchor.index)
+    const boldMatches = [...before.matchAll(/<b[^>]*>([\s\S]*?)<\/b>/gi)]
+    const nearestBold = boldMatches.at(-1)?.[1] ?? ""
+    const author = textOnly(nearestBold).trim()
+    const visible = textOnly(mailAnchor[2] ?? "")
+    const email = normalizeObfuscatedEmail(visible) || normalizeObfuscatedEmail(mailAnchor[1] ?? "")
     if (author && email) return { author, email }
   }
 
-  // Fallback for mirrors/older Pipermail variants where markup has been
-  // flattened: search the header as a whole instead of assuming one line.
-  const flattened = headerText.match(/([A-Za-z][A-Za-z .'-]{1,80}?)\s+([A-Za-z0-9._%+-]+)\s+at\s+([A-Za-z0-9.-]+\.[A-Za-z]{2,})/i)
-  if (flattened) {
-    const author = flattened[1]?.replace(/^.*(?:previous message|next message|messages sorted by)[^A-Za-z]*/i, "").trim() ?? ""
-    const email = `${flattened[2]}@${flattened[3]}`
-    if (author && email) return { author, email }
+  // Legacy/mirrored pages may flatten the header. Restrict this fallback to one
+  // logical line so an h1/subject cannot be absorbed into the sender name.
+  for (const line of headerText.split("\n")) {
+    const sender = line.match(/^\s*([A-Za-z][A-Za-z .'-]{1,80}?)\s+([A-Za-z0-9._%+-]+)\s+at\s+([A-Za-z0-9.-]+\.[A-Za-z]{2,})\s*$/i)
+    if (!sender || /unsubscribe|majordomo|messages sorted by/i.test(line)) continue
+    return { author: sender[1]?.trim() ?? "", email: `${sender[2]}@${sender[3]}` }
   }
 
   return { author: "", email: "" }
