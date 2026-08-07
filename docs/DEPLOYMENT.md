@@ -1,59 +1,63 @@
-# Notion Worker deployment and readback
+# Free Cloudflare + Notion deployment and readback
 
-This repository is designed to fail closed. A successful Git commit or build is not evidence that a Notion Worker is deployed or operating correctly.
+The runtime deliberately avoids Notion Workers. It uses Cloudflare Workers Free, D1 Free and the standard Notion REST API.
 
-## Platform prerequisite
+## Required secrets
 
-Notion Workers are available on Business and Enterprise workspaces and must be enabled by a workspace owner. Do not attempt to bypass this platform gate.
+Use a protected GitHub Actions environment named `cloudflare-production`.
 
-## GitHub environment
+Required for Cloudflare deploy:
 
-Create a protected GitHub Actions environment named `notion-production` and configure these secrets there:
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
 
-- `NOTION_API_TOKEN` — a Notion token accepted by the official `ntn` CLI.
-- `NOTION_WORKSPACE_ID` — the target workspace identifier. Keep it in the protected environment rather than committing it to this public repository.
+Required only when enabling Notion writes:
 
-Recommended environment protection: require an owner review before deployment.
+- `NOTION_API_TOKEN` — token of a normal Notion internal integration that has access only to the Satoshi research archive targets.
 
-## Deployment workflow
+Optional:
 
-Run **Notion Worker Deploy + Readback** manually.
+- `ADMIN_TOKEN` — protects manual `/run/*` HTTP calls. If absent, manual runs fail closed; Cron continues to work.
 
-1. Leave `deploy=false` for a verification-only run.
-2. Set `deploy=true` to deploy after `npm run verify` passes.
-3. Keep `trigger_live_syncs=false` for the first deployment. The workflow deploys, reads back capabilities, and previews the selected syncs without database writes.
-4. Only after the preview output is correct, run again with `trigger_live_syncs=true` to execute the selected live syncs.
+Secrets never belong in repository files or chat transcripts.
 
-The deployment job is bound to the exact checked-out Git revision and reruns verification on the same runner before calling `ntn workers deploy --name satoshi-bitcoin-research`.
+## Deployment sequence
 
-## Evidence required for green state
+Run **Cloudflare Free Research Runtime** manually.
 
-A runtime green state requires all of the following:
+1. `deploy=false`: verification only.
+2. `deploy=true`, `activate_notion_writes=false`: resolve/create D1, migrate it and deploy the exact revision in `preview` mode. Public sources may be fetched and D1 receipts may be written, but Notion is not mutated.
+3. After preview evidence is acceptable, run `deploy=true`, `activate_notion_writes=true`. The workflow installs the Notion secret and redeploys the same exact revision with `AUTONOMY_MODE=live`.
 
-- exact Git revision recorded;
-- dependency installation succeeded;
-- TypeScript check and tests succeeded;
-- `ntn workers deploy` succeeded;
-- `ntn workers capabilities list` returned the expected capabilities;
-- source and hype sync previews succeeded;
-- `ntn workers sync status` returned without error;
-- if live syncs were requested, each trigger succeeded;
-- managed Notion databases are then read back and sampled for expected canonical IDs, hashes, provenance fields, and evidence classifications.
+The D1 database is resolved by the fixed name `satoshi-research`; its ID is injected into a generated Wrangler config during the workflow and never needs to be committed.
 
-Do not describe the worker as live merely because the GitHub workflow completed before the Notion-side readback is performed.
+## Standing authority
 
-## Current capability keys
+`research-archive-v1` permits public reads plus upsert/readback only in these two Notion Data Sources:
 
-- `bitcoinCoreCommits`
-- `bitcoinCoreCommitBackfill` (manual historical backfill; deliberately not triggered by the standard production workflow)
-- `bitcoinCoreReleases`
-- `historicalWaybackCaptures`
-- `bitcoinHypeFeeds`
-- `deriveResearchPaths`
-- `assessEvidence`
-- `calculateHype`
-- `canonicalSourceId`
+- `a7569cee-15e1-4847-845c-5317614ce370` — Quellen- und Entitätenarchiv
+- `9edf6d9c-8164-4263-adb7-b59229e920ac` — BTC Hype & Aufmerksamkeitssignale
+
+The runtime has no delete/archive operation and no generic Notion target parameter. A changed target ID is rejected by code.
+
+## Free-plan operating envelope
+
+The runtime is designed for four Cron Triggers and small batches. Cloudflare Free currently permits five Cron Triggers per account, 100,000 Worker requests/day and 50 subrequests per invocation. D1 Free currently includes 5 million rows read/day, 100,000 rows written/day and 5 GB total storage. These are platform limits, not a promise that every research source will remain below its own external rate limits.
+
+## Runtime green state
+
+Do not call the runtime green until all applicable evidence exists:
+
+- exact Git revision;
+- CI success on that revision;
+- Cloudflare deploy success;
+- D1 tables `sync_state`, `records`, `action_receipts` read back;
+- Worker `/health` reports the same revision and expected mode;
+- at least one source lane runs successfully;
+- in live mode, the resulting Notion page is retrieved again;
+- canonical ID and record hash match expected values;
+- only then is `Readback geprüft` set true.
 
 ## Rollback
 
-Worker code is Git-revisioned. If a deployment regresses, redeploy a previously verified commit. Do not reset sync state unless the recovery procedure explicitly requires a full re-ingestion; deployment itself should preserve sync cursors.
+Redeploy a previously verified Git revision in `preview` mode first. D1 cursors are not deleted during rollback. Notion records are never bulk-deleted by this runtime.
