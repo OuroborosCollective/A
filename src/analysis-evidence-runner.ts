@@ -35,6 +35,14 @@ interface AnalysisResultResponse {
   completedAt: string
 }
 
+interface AnalysisPublicationResponse {
+  taskId: string
+  resultSha256: string
+  notionPageId: string
+  notionReadbackAt: string
+  reused: boolean
+}
+
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim()
   if (!value) throw new Error(`${name} is required`)
@@ -143,6 +151,15 @@ async function verifyResult(fixture: AnalysisFixture, result: AnalysisResultResp
   return expectedSha
 }
 
+async function publishAndVerify(workerUrl: string, token: string, fixture: AnalysisFixture, expectedSha: string): Promise<AnalysisPublicationResponse> {
+  const publication = await postJson(workerUrl, token, "/analysis/publish", { taskId: fixture.taskId }) as unknown as AnalysisPublicationResponse
+  if (publication.taskId !== fixture.taskId) throw new Error("analysis publication taskId mismatch")
+  if (publication.resultSha256 !== expectedSha) throw new Error("analysis publication SHA-256 mismatch")
+  if (!publication.notionPageId) throw new Error("analysis publication notionPageId missing")
+  if (!publication.notionReadbackAt) throw new Error("analysis publication notionReadbackAt missing")
+  return publication
+}
+
 export async function runAnalysisEvidence(fixturePath: string): Promise<void> {
   const workerUrl = requiredEnv("WORKER_URL").replace(/\/$/, "")
   const token = requiredEnv("ADMIN_TOKEN")
@@ -152,7 +169,8 @@ export async function runAnalysisEvidence(fixturePath: string): Promise<void> {
   const existing = await getResult(workerUrl, token, fixture.taskId)
   if (existing) {
     const sha = await verifyResult(fixture, existing)
-    console.log(`analysis evidence reused task=${fixture.taskId} status=${fixture.status} sha256=${sha}`)
+    const publication = await publishAndVerify(workerUrl, token, fixture, sha)
+    console.log(`analysis evidence reused task=${fixture.taskId} status=${fixture.status} sha256=${sha} notion_page=${publication.notionPageId} publication_reused=${publication.reused}`)
     return
   }
 
@@ -182,7 +200,8 @@ export async function runAnalysisEvidence(fixturePath: string): Promise<void> {
     const readback = await getResult(workerUrl, token, fixture.taskId)
     if (!readback) throw new Error("analysis result missing after completion")
     const sha = await verifyResult(fixture, readback)
-    console.log(`analysis evidence completed task=${fixture.taskId} status=${fixture.status} sha256=${sha}`)
+    const publication = await publishAndVerify(workerUrl, token, fixture, sha)
+    console.log(`analysis evidence completed task=${fixture.taskId} status=${fixture.status} sha256=${sha} notion_page=${publication.notionPageId} publication_reused=${publication.reused}`)
     claim = null
   } catch (error) {
     if (claim?.leaseId) {
