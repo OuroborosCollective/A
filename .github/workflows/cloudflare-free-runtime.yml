@@ -31,7 +31,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: satoshi-cloudflare-runtime
+  group: ${{ github.event_name == 'pull_request' && format('satoshi-cloudflare-verify-{0}', github.event.pull_request.head.sha) || 'satoshi-cloudflare-production' }}
   cancel-in-progress: false
 
 jobs:
