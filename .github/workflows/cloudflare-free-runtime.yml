@@ -189,18 +189,28 @@ jobs:
         run: |
           set -euo pipefail
           rm -f health.json
+          MATCHED=0
           for i in $(seq 1 12); do
-            if curl -fsS "$WORKER_URL/health" -o health.json; then break; fi
+            if curl -fsS "$WORKER_URL/health" -o health.json; then
+              cat health.json
+              if node - <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('health.json','utf8'));
+          if (x.ok !== true) process.exit(1);
+          if (x.revision !== process.env.DEPLOY_REVISION) process.exit(1);
+          if (x.mode !== process.env.EXPECTED_MODE) process.exit(1);
+          NODE
+              then
+                MATCHED=1
+                break
+              fi
+            fi
             sleep 5
           done
-          test -s health.json
-          cat health.json
+          test "$MATCHED" = "1" || { echo "Worker never converged to expected revision/mode" >&2; exit 1; }
           node - <<'NODE'
           const fs = require('fs');
           const x = JSON.parse(fs.readFileSync('health.json','utf8'));
-          if (x.ok !== true) throw new Error('health ok != true');
-          if (x.revision !== process.env.DEPLOY_REVISION) throw new Error(`revision mismatch ${x.revision} != ${process.env.DEPLOY_REVISION}`);
-          if (x.mode !== process.env.EXPECTED_MODE) throw new Error(`mode mismatch ${x.mode} != ${process.env.EXPECTED_MODE}`);
           console.log(`health verified revision=${x.revision} mode=${x.mode}`);
           NODE
 

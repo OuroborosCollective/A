@@ -2,12 +2,16 @@ import { assertAllowedNotionTarget, NOTION_TARGETS } from "./consent.js"
 import type { HypeSignal, ResearchSource } from "./domain/types.js"
 
 const DEFAULT_NOTION_VERSION = "2025-09-03"
+const MIN_REQUEST_INTERVAL_MS = 350
+const MAX_RETRIES = 5
 
 type Json = Record<string, unknown>
 
 interface NotionListResponse {
   results?: Array<{ id: string }>
 }
+
+let nextRequestAt = 0
 
 function headers(token: string, version = DEFAULT_NOTION_VERSION): HeadersInit {
   if (!token.trim()) throw new Error("NOTION_API_TOKEN is missing")
@@ -18,16 +22,47 @@ function headers(token: string, version = DEFAULT_NOTION_VERSION): HeadersInit {
   }
 }
 
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+async function waitForNotionSlot(): Promise<void> {
+  const now = Date.now()
+  const waitMs = Math.max(0, nextRequestAt - now)
+  if (waitMs) await sleep(waitMs)
+  nextRequestAt = Date.now() + MIN_REQUEST_INTERVAL_MS
+}
+
+function retryDelayMs(response: Response, attempt: number): number {
+  const retryAfter = response.headers.get("retry-after")?.trim()
+  if (retryAfter) {
+    const seconds = Number(retryAfter)
+    if (Number.isFinite(seconds) && seconds >= 0) return Math.max(MIN_REQUEST_INTERVAL_MS, seconds * 1000)
+    const at = Date.parse(retryAfter)
+    if (!Number.isNaN(at)) return Math.max(MIN_REQUEST_INTERVAL_MS, at - Date.now())
+  }
+  return Math.min(8_000, 500 * 2 ** attempt)
+}
+
 async function notionRequest<T>(token: string, path: string, init: RequestInit = {}, version?: string): Promise<T> {
-  const response = await fetch(`https://api.notion.com${path}`, {
-    ...init,
-    headers: { ...headers(token, version), ...(init.headers ?? {}) },
-  })
-  if (!response.ok) {
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt += 1) {
+    await waitForNotionSlot()
+    const response = await fetch(`https://api.notion.com${path}`, {
+      ...init,
+      headers: { ...headers(token, version), ...(init.headers ?? {}) },
+    })
+    if (response.ok) return (await response.json()) as T
+
+    const retryable = response.status === 429 || response.status === 502 || response.status === 503 || response.status === 504
+    if (retryable && attempt < MAX_RETRIES) {
+      await sleep(retryDelayMs(response, attempt))
+      continue
+    }
+
     const body = await response.text()
     throw new Error(`Notion API ${response.status} ${path}: ${body.slice(0, 500)}`)
   }
-  return (await response.json()) as T
+  throw new Error(`Notion API retry budget exhausted: ${path}`)
 }
 
 function richText(value: string): Json {
