@@ -125,6 +125,9 @@ export interface ForumSyncState {
   satoshiComplete?: boolean
 }
 
+const FORUM_HISTORICAL_BATCH = 1
+const FORUM_RECENT_CLAIM_BATCH = 1
+
 export async function collectForumPage(
   state: ForumSyncState | undefined
 ): Promise<SyncPage<ResearchSource, ForumSyncState>> {
@@ -133,13 +136,13 @@ export async function collectForumPage(
   const satoshiComplete = state?.satoshiComplete ?? false
   const satoshiPage = satoshiComplete
     ? { posts: [], hasMore: false, nextStart: satoshiStart }
-    : await fetchSatoshiForumPosts(satoshiStart, 10)
-  const recentClaims = await fetchRecentSatoshiClaims(10)
+    : await fetchSatoshiForumPosts(satoshiStart, FORUM_HISTORICAL_BATCH)
+  const recentClaims = await fetchRecentSatoshiClaims(FORUM_RECENT_CLAIM_BATCH)
 
-  const rawPosts = [...satoshiPage.posts, ...recentClaims]
+  const rawPosts = [...satoshiPage.posts, ...recentClaims].slice(0, FORUM_HISTORICAL_BATCH + FORUM_RECENT_CLAIM_BATCH)
   const records = await Promise.all(rawPosts.map((post) => forumPostToSource(post, retrievedAt)))
   const deduped = [...new Map(records.map((record) => [record.canonicalId, record])).values()]
-  const nextComplete = satoshiComplete || (!satoshiPage.hasMore && satoshiPage.posts.length < 10)
+  const nextComplete = satoshiComplete || (!satoshiPage.hasMore && satoshiPage.posts.length < FORUM_HISTORICAL_BATCH)
 
   return {
     records: deduped,
