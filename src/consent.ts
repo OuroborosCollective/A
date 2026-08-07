@@ -1,10 +1,11 @@
-export const AUTHORITY_VERSION = "research-archive-v2"
+export const AUTHORITY_VERSION = "research-archive-v3"
 
 export const NOTION_TARGETS = {
   sources: "a7569cee-15e1-4847-845c-5317614ce370",
   hype: "9edf6d9c-8164-4263-adb7-b59229e920ac",
   claims: "7ba3564e-c996-4ab7-ab9e-3bcaef89bbf3",
   followups: "d091aa97-4bce-47de-9fe7-c23d52759dd5",
+  analysisResults: "7a86f38f-aac0-43c5-a602-a6f5a4b28124",
 } as const
 
 export const STANDING_AUTHORITY = {
@@ -16,6 +17,8 @@ export const STANDING_AUTHORITY = {
     "write-open-claim-candidate",
     "write-follow-up-research-plan",
     "queue-analysis-task",
+    "write-reproducible-analysis-result",
+    "readback-analysis-result-publication",
     "write-d1-sync-state",
     "write-action-receipt",
   ],
