@@ -1,25 +1,24 @@
 {
-  "name": "@ouroboroscollective/satoshi-notion-research-worker",
-  "version": "0.1.0",
+  "name": "@ouroboroscollective/satoshi-free-research-runtime",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Evidence-first Notion Worker for autonomous Satoshi Nakamoto and Bitcoin research.",
+  "description": "Evidence-first Satoshi/Bitcoin research runtime for Cloudflare Workers Free + D1 + standard Notion API.",
   "scripts": {
     "build": "tsc",
     "check": "tsc --project tsconfig.test.json",
     "test": "node --import tsx --test test.ts",
-    "verify": "npm run check && npm test"
+    "verify": "npm run check && npm test",
+    "cf:deploy": "wrangler deploy --config wrangler.generated.jsonc"
   },
   "engines": {
     "node": ">=22.0.0",
     "npm": ">=10.0.0"
   },
-  "dependencies": {
-    "@notionhq/workers": "0.8.4"
-  },
   "devDependencies": {
     "@types/node": "22.17.0",
     "tsx": "4.20.3",
-    "typescript": "5.9.2"
+    "typescript": "5.9.2",
+    "wrangler": "4.114.0"
   }
 }

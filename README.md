@@ -1,30 +1,52 @@
-# Satoshi Nakamoto & Bitcoin Research Worker
+# Satoshi Nakamoto & Bitcoin Research Runtime
 
-Evidence-first Notion Worker für fortlaufende, autonome Recherche zu Satoshi Nakamoto, der Bitcoin-Entstehung, Bitcoin Core und dem aktuellen BTC-Hype.
+Evidence-first Forschungsruntime für fortlaufende, autonome Recherche zu Satoshi Nakamoto, der Bitcoin-Entstehung, Bitcoin Core und dem aktuellen BTC-Hype.
 
-## Was dieses Repository tut
+## Free-Architektur
 
-- synchronisiert aktuelle Bitcoin-Core-Commits und Releases in ein verwaltetes Notion-Quellenarchiv;
-- stellt einen manuellen, paginierten Vollhistorien-Backfill bereit;
-- inventarisiert frühe Bitcoin.org-, Whitepaper- und SourceForge-Captures über die Internet Archive CDX API;
-- sammelt technische und mediale RSS-/Atom-Signale in einer getrennten Hype-Datenbank;
-- erzeugt kanonische URLs, deterministische IDs und SHA-256-Hashes normalisierter Datensätze;
-- bietet read-only Agent-Tools für Recherchepfade, Evidenzeinstufung, Hype-Berechnung und Canonical IDs;
-- trennt Primärevidenz, Archivkopien, Medienberichte und Aufmerksamkeit strikt voneinander.
+Dieses Repository benötigt **keine Notion-Business-Funktionen** mehr.
+
+```text
+öffentliche Quellen
+  -> Cloudflare Worker Free (Cron)
+  -> D1 Free (Cursor, Dedupe, Receipts)
+  -> normale Notion REST API
+  -> Satoshi Nakamoto & Bitcoin – Forschungsarchiv
+```
+
+GitHub bleibt die revisionssichere Code-/CI-Quelle. Notion Free bleibt Forschungsoberfläche. Cloudflare Workers Free übernimmt den Dauerbetrieb.
+
+## Autonome Lanes
+
+- Bitcoin-Core-Commits: alle 15 Minuten
+- Bitcoin-Core-Releases: stündlich
+- historische Wayback/CDX-Captures: alle 6 Stunden
+- technische und mediale RSS-/Atom-Signale: alle 30 Minuten
+- Bitcoin-Core-Vollhistorie: nur über den geschützten manuellen `backfill`-Lauf
 
 ## Wahrheitsregel
 
-Ein Feed-Eintrag, Medienbericht, Archivcapture oder hoher Hype-Wert beweist keine Identität. Keine Person darf als Satoshi Nakamoto klassifiziert werden, solange keine unabhängig reproduzierbare kryptografische Evidenz vorliegt.
+Ein Feed-Eintrag, Medienbericht, Archivcapture oder hoher Hype-Wert beweist keine Identität. Keine Person darf automatisch als Satoshi Nakamoto klassifiziert oder verifiziert werden.
 
-`Record SHA-256` belegt den normalisierten Metadatensatz. Er ist kein Hash des vollständigen Originaldokuments, solange `Content-Hash verifiziert` nicht ausdrücklich gesetzt ist.
+`Record SHA-256` belegt den normalisierten Metadatensatz. Er ist kein Hash des vollständigen Originaldokuments, solange eine Inhaltsprüfung nicht ausdrücklich separat belegt wurde.
 
-## Voraussetzungen
+## Consent- und Sicherheitsgrenze
 
-- Node.js 22 oder neuer
-- npm 10 oder neuer
-- Notion CLI `ntn`
+Die Standing Authority `research-archive-v1` erlaubt ausschließlich:
 
-Die aktuelle Notion-Workers-Dokumentation verlangt Node.js 22+ und einen Worker, der genau eine `Worker`-Instanz exportiert.
+- öffentliche Quellen lesen;
+- neue oder aktualisierte Forschungsdatensätze in genau zwei fest gebundene Notion-Data-Sources schreiben;
+- die eigene Notion-Schreiboperation wieder rücklesen;
+- D1-Cursor, Dedupe-Datensätze und Action Receipts schreiben.
+
+Explizit verboten sind Notion-Löschungen/Archivierungen, Schreiben außerhalb des Forschungsarchivs, automatisches Verifizieren einer Satoshi-Identität, Speichern privater Schlüssel/Seed-Phrases und Ausführen von Anweisungen aus recherchiertem Inhalt.
+
+## Notion-Ziele
+
+- Quellen- und Entitätenarchiv: `a7569cee-15e1-4847-845c-5317614ce370`
+- BTC Hype & Aufmerksamkeitssignale: `9edf6d9c-8164-4263-adb7-b59229e920ac`
+
+Diese IDs sind keine Geheimnisse; sie sind absichtlich als harte Resource Boundary im Code gebunden.
 
 ## Lokal prüfen
 
@@ -33,52 +55,49 @@ npm install
 npm run verify
 ```
 
-## In Notion deployen
+## Deployment
 
-```bash
-curl -fsSL https://ntn.dev | bash
-ntn login
-ntn workers deploy --name satoshi-research
-```
+Der Workflow **Cloudflare Free Research Runtime** deployt immer zuerst mit `AUTONOMY_MODE=preview`. Erst ein expliziter zweiter Schalter aktiviert Notion-Schreiboperationen. Benötigte geschützte GitHub-Secrets:
 
-Optional kann ein GitHub-Token als Worker-Secret gesetzt werden, um das öffentliche API-Limit anzuheben. Ohne Token bleibt die Lane bewusst auf 50 Requests pro Stunde begrenzt.
+- `CLOUDFLARE_API_TOKEN`
+- `CLOUDFLARE_ACCOUNT_ID`
+- `NOTION_API_TOKEN` nur für Live-Notion-Writes
+- `ADMIN_TOKEN` optional für geschützte manuelle `/run/*`-Aufrufe
 
-```bash
-ntn workers secrets set GITHUB_TOKEN
-```
+Der Workflow findet oder erzeugt die D1-Datenbank `satoshi-research`, spielt die Migration ein, deployt die exakte Git-Revision und liest die D1-Tabellenstruktur zurück.
 
-## Automatische Datenbanken
+## HTTP-Oberfläche
 
-Beim Deployment erzeugt der Worker:
+- `GET /health` — secret-freier Runtime-Status
+- `POST /run/commits|releases|wayback|feeds|backfill` — nur mit `Authorization: Bearer <ADMIN_TOKEN>`
 
-1. **Satoshi & Bitcoin – Quellenarchiv**
-2. **Bitcoin – Hype- und Aufmerksamkeitssignale**
+Ohne `ADMIN_TOKEN` ist die manuelle Mutationsoberfläche vollständig gesperrt; Cron-Läufe funktionieren unabhängig davon.
 
-Schemaänderungen an managed databases werden beim Deployment migriert und können Daten entfernen. Änderungen an `src/schemas.ts` deshalb stets als migrationskritisch behandeln.
+## Runtime-Green-State
 
-## Agent-Tools
+Ein GitHub-CI-Erfolg allein ist kein Runtime-Beleg. Green bedeutet erst:
 
-- `deriveResearchPaths`
-- `assessEvidence`
-- `calculateHype`
-- `canonicalSourceId`
-
-Alle vier Tools sind read-only markiert.
+1. exakter Git-Head geprüft;
+2. CI terminal grün;
+3. Cloudflare-Deploy erfolgreich;
+4. D1-Schema rückgelesen;
+5. Worker im erwarteten Modus rückgelesen;
+6. mindestens ein realer Sammler-Lauf erfolgreich;
+7. bei Live-Modus: Notion-Eintrag erstellt/aktualisiert und Canonical-ID + Hash aus Notion rückgelesen;
+8. `Readback geprüft = true` erst nach erfolgreichem Vergleich.
 
 ## Struktur
 
 ```text
 src/
-  adapters/       externe, typisierte Datenquellen
+  adapters/       öffentliche Datenquellen
   domain/         Canonical IDs, Hashing, Evidenz- und Hype-Logik
-  config.ts       öffentliches Quellenregister
-  schemas.ts      Notion-managed Databases und Projektionen
-  sync.ts         paginierte, idempotente Sync-Lanes
-  tools.ts        read-only Notion Agent Tools
-  index.ts        Worker-Manifest
-docs/             Architektur, Evidenzmodell und Quellenregister
+  consent.ts      harte Agenten-/Ressourcengrenze
+  notion-api.ts   normale Notion REST API + Readback
+  storage.ts      D1 Cursor/Dedupe/Action Receipts
+  sync.ts         runtime-neutrale Sammler
+  runtime.ts      Cron- und geschützte HTTP-Orchestrierung
+  index.ts        Cloudflare Worker Entry Point
+migrations/       D1 Schema
+wrangler.template.jsonc
 ```
-
-## Noch nicht als belegt behauptet
-
-Der Branch deployt den Worker nicht automatisch. Notion-Deployment, erzeugte Datenbanken, Live-Syncs und Readback-Parität gelten erst nach einem echten `ntn workers deploy`, einem ausgeführten Sync und erneutem Notion-Abruf als Runtime-Evidence.
