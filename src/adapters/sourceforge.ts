@@ -1,7 +1,7 @@
 export interface SourceForgeSeed {
   apiUrl: string
   publicUrl: string
-  kind: "project" | "news" | "code"
+  kind: "project" | "news" | "code" | "files"
   title?: string
 }
 
@@ -90,4 +90,53 @@ export async function fetchSourceForgePage(seed: SourceForgeSeed): Promise<Sourc
     throw new Error(`SourceForge REST payload too large: ${lengthHeader}`)
   }
   return parseSourceForgeRest(await response.json(), seed)
+}
+
+// Legacy/test-only HTML parser. The production collector above never calls this path.
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#(\d+);/g, (_, code: string) => String.fromCodePoint(Number(code)))
+}
+
+function stripHtml(value: string): string {
+  return decodeEntities(
+    value
+      .replace(/<script\b[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style\b[\s\S]*?<\/style>/gi, " ")
+      .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, " ")
+      .replace(/<[^>]+>/g, " ")
+  ).replace(/\s+/g, " ").trim()
+}
+
+export function parseSourceForgePage(html: string, url: string): SourceForgePage {
+  const text = stripHtml(html)
+  const title = stripHtml(
+    html.match(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i)?.[1]
+      ?? html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]
+      ?? html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1]
+      ?? "SourceForge Bitcoin record"
+  ).replace(/\s*[-|/]\s*SourceForge(?:\.net)?\s*$/i, "")
+  const date = text.match(/Posted by\s+.{0,120}?\b(20\d{2}|19\d{2})-(\d{2})-(\d{2})\b/i)
+    ?? text.match(/\b(20\d{2}|19\d{2})-(\d{2})-(\d{2})\b/)
+  const kind: SourceForgeSeed["kind"] = /\/news(?:\/|$)/i.test(url)
+    ? "news"
+    : /\/code(?:\/|$)/i.test(url)
+      ? "code"
+      : /\/files(?:\/|$)/i.test(url)
+        ? "files"
+        : "project"
+  return {
+    url,
+    apiUrl: "legacy-html-test-only",
+    title,
+    publishedAt: date ? `${date[1]}-${date[2]}-${date[3]}T00:00:00.000Z` : undefined,
+    text: text.slice(0, 5000),
+    kind,
+  }
 }
