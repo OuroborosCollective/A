@@ -128,6 +128,53 @@ test("Bitcointalk parser attributes u=3 post without quoted text", () => {
   assert.doesNotMatch(posts[0]?.body ?? "", /must not be attributed/)
 })
 
+test("Bitcointalk parser accepts legacy showPosts table rows", () => {
+  const html = `
+    <table>
+      <tr class="catbg">
+        <td colspan="2" align="left" class="smalltext">
+          <div style="float: right;">Posted on: July 25, 2010, 10:06:57 PM</div>
+          Posted by: satoshi
+        </td>
+      </tr>
+      <tr class="windowbg2">
+        <td class="smalltext" id="msg12345">
+          <div align="right" onclick="return insertQuoteFast(12345);">Insert Quote</div>
+          <div class="post">For future reference, here is my public key. Check the fingerprint and signatures independently.</div>
+        </td>
+      </tr>
+    </table>
+    <a href="https://bitcointalk.org/index.php?action=profile;u=3;sa=showPosts;start=10">next</a>
+  `
+  const posts = parseBitcointalkPosts(html, { author: "satoshi", authorId: "3" })
+  assert.equal(posts.length, 1)
+  assert.equal(posts[0]?.messageId, "12345")
+  assert.equal(posts[0]?.authorId, "3")
+  assert.equal(posts[0]?.isSatoshiAccount, true)
+  assert.match(posts[0]?.body ?? "", /public key/)
+  assert.match(posts[0]?.url ?? "", /\?msg=12345$/)
+})
+
+test("Bitcointalk parser binds deeply nested showPosts cells by nearest msg id", () => {
+  const html = `
+    <div id="bodyarea"><table><tr><td><table><tr><td><table>
+      <tr><td>Topic: <a href="index.php?topic=48.0">Re: Transaction volume</a></td></tr>
+      <tr><td>Posted on: February 14, 2010, 11:15:12 PM</td></tr>
+      <tr><td id="msg329"><span onclick="return insertQuoteFast(329);">quote</span>
+        <div class="post">I'm sure that in 20 years there will either be very large transaction volume or no volume.</div>
+      </td></tr>
+      <tr><td>separator unrelated to the post</td></tr>
+    </table></td></tr></table></td></tr></table></div>
+  `
+  const posts = parseBitcointalkPosts(html, { author: "satoshi", authorId: "3" })
+  const post = posts.find((item) => item.messageId === "329")
+  assert.ok(post)
+  assert.equal(post?.topicId, "48")
+  assert.equal(post?.isSatoshiAccount, true)
+  assert.match(post?.body ?? "", /transaction volume/)
+  assert.match(post?.url ?? "", /topic=48/)
+})
+
 function forumSource(summary: string): ResearchSource {
   return {
     canonicalId: "bitcointalk-message:0123456789abcdef",
