@@ -2,6 +2,10 @@ name: Cloudflare Free Research Runtime
 
 on:
   pull_request:
+  push:
+    branches: [main]
+    paths:
+      - ".deploy/cloudflare-request.json"
   workflow_dispatch:
     inputs:
       deploy:
@@ -34,7 +38,7 @@ jobs:
       - run: npm run verify
 
   deploy:
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.deploy }}
+    if: ${{ (github.event_name == 'workflow_dispatch' && inputs.deploy) || github.event_name == 'push' }}
     needs: verify
     runs-on: ubuntu-latest
     environment: cloudflare-production
@@ -45,11 +49,37 @@ jobs:
       ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
       - run: npm install --ignore-scripts
       - run: npm run verify
+
+      - name: Resolve requested deployment mode
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            node - <<'NODE' >> "$GITHUB_OUTPUT"
+          const fs = require('fs');
+          const cp = require('child_process');
+          const req = JSON.parse(fs.readFileSync('.deploy/cloudflare-request.json', 'utf8'));
+          if (req.enabled !== true) throw new Error('deploy request is not enabled');
+          if (!['preview', 'live'].includes(req.mode)) throw new Error('deploy request mode must be preview or live');
+          const parent = cp.execSync('git rev-parse HEAD^', { encoding: 'utf8' }).trim();
+          if (req.base_sha !== parent) throw new Error(`deploy request base_sha ${req.base_sha} does not match parent ${parent}`);
+          process.stdout.write(`mode=${req.mode}\n`);
+          NODE
+          else
+            if [ "${{ inputs.activate_notion_writes }}" = "true" ]; then
+              echo "mode=live" >> "$GITHUB_OUTPUT"
+            else
+              echo "mode=preview" >> "$GITHUB_OUTPUT"
+            fi
+          fi
 
       - name: Fail closed on Cloudflare credentials
         shell: bash
@@ -93,7 +123,7 @@ jobs:
         run: npx wrangler@4.114.0 deploy --config wrangler.generated.jsonc
 
       - name: Install Notion secret without exposing it
-        if: ${{ inputs.activate_notion_writes }}
+        if: ${{ steps.request.outputs.mode == 'live' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -101,7 +131,7 @@ jobs:
           printf '%s' "$NOTION_API_TOKEN" | npx wrangler@4.114.0 secret put NOTION_API_TOKEN --config wrangler.generated.jsonc
 
       - name: Install optional protected manual-run token
-        if: ${{ inputs.activate_notion_writes }}
+        if: ${{ steps.request.outputs.mode == 'live' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -110,7 +140,7 @@ jobs:
           fi
 
       - name: Switch exact revision to live Notion writes
-        if: ${{ inputs.activate_notion_writes }}
+        if: ${{ steps.request.outputs.mode == 'live' }}
         env:
           D1_DATABASE_ID: ${{ steps.d1.outputs.database_id }}
         shell: bash

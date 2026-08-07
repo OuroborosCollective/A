@@ -1,0 +1,6 @@
+{
+  "enabled": true,
+  "mode": "preview",
+  "base_sha": "8bd457ee648438b6a90f68fe157d08e75d261afe",
+  "reason": "First free Cloudflare runtime deployment after credentials were confirmed configured"
+}
