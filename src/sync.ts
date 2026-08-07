@@ -12,6 +12,11 @@ import {
   waybackTimestampToIso,
   type WaybackCapture,
 } from "./adapters/wayback.js"
+import {
+  fetchRecentSatoshiClaims,
+  fetchSatoshiForumPosts,
+  type BitcointalkPost,
+} from "./adapters/bitcointalk.js"
 import { canonicalSourceId, canonicalizeUrl } from "./domain/canonical.js"
 import { sha256Hex, stableJson } from "./domain/hash.js"
 import { calculateHype } from "./domain/research.js"
@@ -115,6 +120,37 @@ export async function collectFeedPage(
   }
 }
 
+export interface ForumSyncState {
+  satoshiStart?: number
+  satoshiComplete?: boolean
+}
+
+export async function collectForumPage(
+  state: ForumSyncState | undefined
+): Promise<SyncPage<ResearchSource, ForumSyncState>> {
+  const retrievedAt = new Date().toISOString()
+  const satoshiStart = state?.satoshiStart ?? 0
+  const satoshiComplete = state?.satoshiComplete ?? false
+  const satoshiPage = satoshiComplete
+    ? { posts: [], hasMore: false, nextStart: satoshiStart }
+    : await fetchSatoshiForumPosts(satoshiStart, 10)
+  const recentClaims = await fetchRecentSatoshiClaims(10)
+
+  const rawPosts = [...satoshiPage.posts, ...recentClaims]
+  const records = await Promise.all(rawPosts.map((post) => forumPostToSource(post, retrievedAt)))
+  const deduped = [...new Map(records.map((record) => [record.canonicalId, record])).values()]
+  const nextComplete = satoshiComplete || (!satoshiPage.hasMore && satoshiPage.posts.length < 10)
+
+  return {
+    records: deduped,
+    hasMore: !nextComplete,
+    nextState: {
+      satoshiStart: nextComplete ? satoshiStart : satoshiPage.nextStart,
+      satoshiComplete: nextComplete,
+    },
+  }
+}
+
 async function commitToSource(commit: GitHubCommit, retrievedAt: string): Promise<ResearchSource> {
   const publishedAt = commit.commit.committer?.date ?? commit.commit.author?.date
   const title = commit.commit.message.split("\n")[0]?.trim() || commit.sha
@@ -184,6 +220,43 @@ async function captureToSource(capture: WaybackCapture, retrievedAt: string): Pr
     summary: `HTTP ${capture.statuscode}; MIME ${capture.mimetype}; CDX-Digest ${capture.digest}.`,
     primarySource: false,
     independentConfirmations: 1,
+  }
+}
+
+function forumSubjects(post: BitcointalkPost): string[] {
+  const text = `${post.title}\n${post.body}`.toLowerCase()
+  const subjects = new Set<string>(["Bitcoin", "Historie"])
+  if (post.isSatoshiAccount || /\bsatoshi|nakamoto\b/.test(text)) subjects.add("Satoshi")
+  if (/\bpgp|gpg|signature|key|hash|crypto|dsa|ecdsa|nonce\b/.test(text)) subjects.add("Kryptografie")
+  if (/\bidentity|real satoshi|creator of bitcoin|who is satoshi\b/.test(text)) subjects.add("Identität")
+  if (/\bcode|client|node|block|transaction|mining|difficulty|protocol|rpc\b/.test(text)) subjects.add("Technik")
+  return [...subjects]
+}
+
+async function forumPostToSource(post: BitcointalkPost, retrievedAt: string): Promise<ResearchSource> {
+  const isSatoshi = post.isSatoshiAccount
+  const timestampNote = post.forumTimestampRaw ? ` Forum-Zeitstempel: ${post.forumTimestampRaw}.` : ""
+  const attribution = isSatoshi
+    ? "Autor-Konto: satoshi (Bitcointalk u=3). Der Datensatz belegt die Veröffentlichung durch dieses historische Forenkonto; das ist kein kryptografischer Identitätsbeweis."
+    : `Forumbehauptung von Konto ${post.author}${post.authorId ? ` (u=${post.authorId})` : ""}. Die Aussage wird nicht automatisch als Tatsache übernommen.`
+  return {
+    canonicalId: await canonicalSourceId("bitcointalk-message", post.messageId, post.url),
+    title: post.title,
+    lane: isSatoshi ? "Satoshi Forum" : "Forum Claims",
+    sourceType: isSatoshi ? "Forum-Post" : "Forum-Behauptung",
+    evidenceTier: isSatoshi ? "Primär belegt" : "Behauptet",
+    originalUrl: canonicalizeUrl(post.url),
+    publishedAt: post.publishedAt,
+    retrievedAt,
+    upstreamId: `msg:${post.messageId};topic:${post.topicId};user:${post.authorId ?? "unknown"}`,
+    recordSha256: await sha256Hex(stableJson(post)),
+    contentHashVerified: false,
+    adapter: "Bitcointalk HTML",
+    status: "In Prüfung",
+    subjects: forumSubjects(post),
+    summary: `${attribution}${timestampNote} Inhalt: ${post.body}`,
+    primarySource: isSatoshi,
+    independentConfirmations: 0,
   }
 }
 
