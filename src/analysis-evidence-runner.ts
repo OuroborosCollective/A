@@ -197,7 +197,7 @@ export async function runAnalysisEvidence(fixturePath: string): Promise<void> {
 }
 
 if (import.meta.url === new URL(`file://${process.argv[1]}`).href) {
-  runAnalysisEvidence(process.argv[2]).catch((error) => {
+  runAnalysisEvidence(process.argv[2] ?? "").catch((error) => {
     console.error(error instanceof Error ? error.message : String(error))
     process.exitCode = 1
   })
