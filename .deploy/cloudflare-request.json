@@ -1,6 +1,6 @@
 {
   "enabled": true,
   "mode": "preview",
-  "base_sha": "8bd457ee648438b6a90f68fe157d08e75d261afe",
-  "reason": "First free Cloudflare runtime deployment after credentials were confirmed configured"
+  "base_sha": "8ba4caa5b2802f3069e79508ec93af1571568d18",
+  "reason": "Evidence run: deploy exact PR head in preview mode, verify health and D1 receipts before live activation"
 }
