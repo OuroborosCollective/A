@@ -2,11 +2,20 @@ import assert from "node:assert/strict"
 import test from "node:test"
 
 import { parseFeed } from "./src/adapters/feed.js"
+import { parseBitcointalkPosts } from "./src/adapters/bitcointalk.js"
 import { canonicalSourceId, canonicalizeUrl } from "./src/domain/canonical.js"
 import { sha256Hex, stableJson } from "./src/domain/hash.js"
-import { assessEvidence, calculateHype, deriveResearchPaths } from "./src/domain/research.js"
+import {
+  assessEvidence,
+  calculateHype,
+  deriveAnalysisTasks,
+  deriveFollowUpPlan,
+  deriveResearchPaths,
+  extractClaimCandidates,
+} from "./src/domain/research.js"
+import type { ResearchSource } from "./src/domain/types.js"
 import { waybackTimestampToIso } from "./src/adapters/wayback.js"
-import { assertAllowedNotionTarget, NOTION_TARGETS } from "./src/consent.js"
+import { assertAllowedNotionTarget, NOTION_TARGETS, STANDING_AUTHORITY } from "./src/consent.js"
 import { laneForCron } from "./src/runtime.js"
 
 test("canonicalizeUrl removes tracking data and sorts retained parameters", () => {
@@ -98,10 +107,70 @@ test("Wayback timestamp becomes ISO UTC", () => {
   assert.equal(waybackTimestampToIso("20090103184505"), "2009-01-03T18:45:05Z")
 })
 
-test("standing authority only permits the two research data sources", () => {
+test("Bitcointalk parser attributes u=3 post without quoted text", () => {
+  const html = `
+  <div id="bodyarea">
+    <div class="windowbg">
+      <div class="poster_info"><b><a href="https://bitcointalk.org/index.php?action=profile;u=3">satoshi</a></b></div>
+      <div class="td_headerandpost"><table><tr><td class="smalltext">December 13, 2010, 04:45:41 PM</td></tr></table>
+        <a href="https://bitcointalk.org/index.php?topic=2228.msg29479#msg29479">Re: Wikileaks</a>
+        <div class="post"><div class="quoteheader">Quote from somebody</div><div class="quote">This must not be attributed.</div>I make this appeal to Wikileaks not to try to use Bitcoin. Bitcoin is a small beta community in its infancy.</div>
+        <div class="signature">signature</div>
+      </div>
+    </div>
+  </div>`
+  const posts = parseBitcointalkPosts(html)
+  assert.equal(posts.length, 1)
+  assert.equal(posts[0]?.authorId, "3")
+  assert.equal(posts[0]?.isSatoshiAccount, true)
+  assert.equal(posts[0]?.messageId, "29479")
+  assert.match(posts[0]?.body ?? "", /small beta community/)
+  assert.doesNotMatch(posts[0]?.body ?? "", /must not be attributed/)
+})
+
+function forumSource(summary: string): ResearchSource {
+  return {
+    canonicalId: "bitcointalk-message:0123456789abcdef",
+    title: "Forum statement",
+    lane: "Satoshi Forum",
+    sourceType: "Forum-Post",
+    evidenceTier: "Primär belegt",
+    originalUrl: "https://bitcointalk.org/index.php?topic=1.0#msg1",
+    publishedAt: "2010-12-13T16:45:41.000Z",
+    retrievedAt: "2026-08-07T14:00:00.000Z",
+    upstreamId: "msg:1;topic:1;user:3",
+    recordSha256: "abc",
+    contentHashVerified: false,
+    adapter: "Bitcointalk HTML",
+    status: "In Prüfung",
+    subjects: ["Satoshi", "Bitcoin", "Kryptografie", "Identität"],
+    summary,
+    primarySource: true,
+    independentConfirmations: 0,
+  }
+}
+
+test("forum claims stay open and identity analysis requires human review", () => {
+  const source = forumSource("Autor-Konto: satoshi. Inhalt: The public key signature and timestamp should be checked before anyone claims that Alice is Satoshi Nakamoto.")
+  const claims = extractClaimCandidates(source)
+  assert.equal(claims.length, 1)
+  assert.equal(claims[0]?.evidenceTier, "Behauptet")
+  const tasks = deriveAnalysisTasks(source, claims)
+  assert.ok(tasks.some((task) => task.kind === "cryptographic-statistics" && task.executor === "wolfram"))
+  assert.ok(tasks.some((task) => task.kind === "stylometry" && task.requiresHumanReview))
+  const plan = deriveFollowUpPlan(source, claims, tasks)
+  assert.equal(plan?.status, "Offen")
+  assert.equal(plan?.paths.length, 6)
+})
+
+test("standing authority permits only four bounded research data sources", () => {
   assert.doesNotThrow(() => assertAllowedNotionTarget(NOTION_TARGETS.sources))
   assert.doesNotThrow(() => assertAllowedNotionTarget(NOTION_TARGETS.hype))
+  assert.doesNotThrow(() => assertAllowedNotionTarget(NOTION_TARGETS.claims))
+  assert.doesNotThrow(() => assertAllowedNotionTarget(NOTION_TARGETS.followups))
   assert.throws(() => assertAllowedNotionTarget("00000000-0000-0000-0000-000000000000"), /Consent boundary rejected/)
+  assert.ok(STANDING_AUTHORITY.forbidden.includes("set-identity-claim-verified"))
+  assert.ok(STANDING_AUTHORITY.forbidden.includes("attempt-private-key-recovery"))
 })
 
 test("cron triggers map deterministically to bounded lanes", () => {
@@ -109,5 +178,6 @@ test("cron triggers map deterministically to bounded lanes", () => {
   assert.equal(laneForCron("7 * * * *"), "releases")
   assert.equal(laneForCron("17 */6 * * *"), "wayback")
   assert.equal(laneForCron("*/30 * * * *"), "feeds")
+  assert.equal(laneForCron("23 */2 * * *"), "forum")
   assert.equal(laneForCron("* * * * *"), null)
 })
