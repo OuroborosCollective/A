@@ -30,3 +30,18 @@ CREATE TABLE IF NOT EXISTS action_receipts (
 
 CREATE INDEX IF NOT EXISTS idx_receipts_run ON action_receipts(run_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_receipts_status ON action_receipts(status, created_at DESC);
+
+CREATE TABLE IF NOT EXISTS analysis_queue (
+  task_id TEXT PRIMARY KEY,
+  source_canonical_id TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  executor TEXT NOT NULL CHECK (executor IN ('research','wolfram')),
+  status TEXT NOT NULL CHECK (status IN ('pending','running','done','blocked')),
+  requires_human_review INTEGER NOT NULL DEFAULT 0,
+  payload_json TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_analysis_queue_status ON analysis_queue(status, executor, created_at);
+CREATE INDEX IF NOT EXISTS idx_analysis_queue_source ON analysis_queue(source_canonical_id, created_at);
