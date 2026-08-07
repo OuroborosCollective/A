@@ -68,7 +68,9 @@ function extractSender(html: string, headerText: string): { author: string; emai
   const mailAnchor = /<a\b[^>]*href=["']mailto:([^"']+)["'][^>]*>([\s\S]*?)<\/a>/i.exec(headerHtml)
   if (mailAnchor && typeof mailAnchor.index === "number") {
     const before = headerHtml.slice(0, mailAnchor.index)
-    const boldMatches = [...before.matchAll(/<b[^>]*>([\s\S]*?)<\/b>/gi)]
+    // Match a real <b> element only. `<b[^>]*>` also matches `<body>`, which
+    // caused the subject/body prefix to be incorrectly absorbed into author.
+    const boldMatches = [...before.matchAll(/<b(?:\s[^>]*)?>([\s\S]*?)<\/b>/gi)]
     const nearestBold = boldMatches.at(-1)?.[1] ?? ""
     const author = textOnly(nearestBold).trim()
     const visible = textOnly(mailAnchor[2] ?? "")
