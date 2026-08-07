@@ -1,0 +1,1 @@
+The production worker is not considered green for direct MetzDowd collection until an evidence-only `deploy/` pull request has run `/run/mailinglist` in preview and then live with independent Notion readback.
