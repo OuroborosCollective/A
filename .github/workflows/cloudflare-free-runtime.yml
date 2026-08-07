@@ -185,10 +185,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          rm -f health.json
           for i in $(seq 1 12); do
             if curl -fsS "$WORKER_URL/health" -o health.json; then break; fi
             sleep 5
           done
+          test -s health.json
           cat health.json
           node - <<'NODE'
           const fs = require('fs');
@@ -202,6 +204,7 @@ jobs:
       - name: Run controlled commits lane
         env:
           WORKER_URL: ${{ steps.worker.outputs.url }}
+          EXPECTED_MODE: ${{ steps.request.outputs.mode }}
         shell: bash
         run: |
           set -euo pipefail
@@ -215,9 +218,6 @@ jobs:
           if (!Number.isInteger(x.count) || x.count < 0) throw new Error('invalid count');
           console.log(`lane verified count=${x.count} hasMore=${x.hasMore}`);
           NODE
-        env:
-          WORKER_URL: ${{ steps.worker.outputs.url }}
-          EXPECTED_MODE: ${{ steps.request.outputs.mode }}
 
       - name: Read back D1 schema and runtime receipts
         run: |
