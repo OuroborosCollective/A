@@ -324,10 +324,31 @@ export function laneForCron(cron: string): Lane | null {
   }
 }
 
+// Lanes executed on every */30 sweep in addition to the primary feeds lane.
+// Cron-triggered lanes need no ADMIN_TOKEN, so this keeps the recurring sweep
+// running even when no external token secret is configured.
+export const SWEEP_LANES: readonly Lane[] = ["commits", "feeds", "forum", "releases"]
+
 export async function scheduled(controller: ScheduledLike, env: Env): Promise<void> {
   const lane = laneForCron(controller.cron)
   if (!lane) throw new Error(`Unknown cron trigger: ${controller.cron}`)
   await runLane(lane, env)
+
+  // The */30 feeds slot doubles as a recurring multi-lane sweep so the runtime
+  // collects fresh evidence every 30 minutes without an external caller.
+  if (controller.cron === "*/30 * * * *") {
+    for (const sweepLane of SWEEP_LANES) {
+      if (sweepLane === lane) continue
+      if (sweepLane === "feeds") continue
+      try {
+        await runLane(sweepLane, env)
+      } catch (error) {
+        // A failing sweep lane must not abort the remaining lanes; the
+        // runLane error path already wrote a failure receipt.
+        void error
+      }
+    }
+  }
 }
 
 export const RUNNABLE_LANES: readonly Lane[] = [

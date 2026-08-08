@@ -39,16 +39,22 @@ jobs:
           set -uo pipefail
           LANES="commits feeds forum mailinglist releases discovery"
           FAILED=0
+          UNAUTH=0
           for lane in $LANES; do
             echo "::group::Lane: $lane"
             STATUS="$(curl -sS -o "lane-${lane}.json" -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/${lane}" || true)"
             cat "lane-${lane}.json" || true
-            if [ "$STATUS" != "200" ]; then
+            if [ "$STATUS" = "401" ]; then
+              echo "Lane ${lane}: 401 (no ADMIN_TOKEN secret; worker cron sweep handles this lane)"
+              UNAUTH=$((UNAUTH + 1))
+            elif [ "$STATUS" != "200" ]; then
               echo "Lane ${lane} returned HTTP ${STATUS}" >&2
               FAILED=$((FAILED + 1))
             fi
             echo "::endgroup::"
           done
+          echo "FAILED=${FAILED}" >> "$GITHUB_ENV"
+          echo "UNAUTH=${UNAUTH}" >> "$GITHUB_ENV"
 
       - name: Run analysis executor
         shell: bash
@@ -57,10 +63,19 @@ jobs:
           echo "::group::Analysis executor"
           STATUS="$(curl -sS -o analysis-execute.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/analysis-execute" || true)"
           cat analysis-execute.json || true
-          if [ "$STATUS" != "200" ]; then
+          if [ "$STATUS" = "401" ]; then
+            echo "Analysis executor: 401 (no ADMIN_TOKEN secret; worker cron handles analysis via '3 */4 * * *')"
+          elif [ "$STATUS" != "200" ]; then
             echo "Analysis executor returned HTTP ${STATUS}" >&2
           fi
           echo "::endgroup::"
+
+      - name: Fail only on real errors (not missing ADMIN_TOKEN)
+        if: env.FAILED != '0'
+        shell: bash
+        run: |
+          echo "Failing: ${FAILED} lane(s) returned non-200/non-401 status"
+          exit 1
 
       - name: Summary
         if: always()
