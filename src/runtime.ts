@@ -1,4 +1,5 @@
 import { isAuthorized } from "./auth.js"
+import { runAnalysisExecutor } from "./runtime-analysis-executor-extension.js"
 import {
   collectCommitBackfillPage,
   collectCommitPage,
@@ -329,6 +330,12 @@ export function laneForCron(cron: string): Lane | null {
 // running even when no external token secret is configured.
 export const SWEEP_LANES: readonly Lane[] = ["commits", "feeds", "forum", "releases"]
 
+// Run the analysis executor every 4h by piggybacking on the */30 sweep:
+// 4h = 8 half-hour ticks, so execute when the hour is divisible by 4 at :00.
+function shouldRunAnalysisExecutor(now: Date): boolean {
+  return now.getMinutes() < 30 && now.getHours() % 4 === 0
+}
+
 export async function scheduled(controller: ScheduledLike, env: Env): Promise<void> {
   const lane = laneForCron(controller.cron)
   if (!lane) throw new Error(`Unknown cron trigger: ${controller.cron}`)
@@ -345,6 +352,16 @@ export async function scheduled(controller: ScheduledLike, env: Env): Promise<vo
       } catch (error) {
         // A failing sweep lane must not abort the remaining lanes; the
         // runLane error path already wrote a failure receipt.
+        void error
+      }
+    }
+
+    // Auto-execute pending analysis tasks every 4h (replaces the removed
+    // '3 */4 * * *' cron — Cloudflare Free allows only 5 cron triggers).
+    if (shouldRunAnalysisExecutor(new Date())) {
+      try {
+        await runAnalysisExecutor(env)
+      } catch (error) {
         void error
       }
     }
