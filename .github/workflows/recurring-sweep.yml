@@ -1,0 +1,81 @@
+name: Recurring runtime sweep
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: satoshi-runtime-sweep
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    env:
+      ADMIN_TOKEN: ${{ secrets.ADMIN_TOKEN }}
+      WORKER_URL: https://satoshi-bitcoin-research.projectouroboroscollective.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve live worker health
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl -fsS "$WORKER_URL/health" | tee health.json
+          node - <<'NODE'
+          const fs = require('fs');
+          const x = JSON.parse(fs.readFileSync('health.json','utf8'));
+          if (x.ok !== true) { console.error('worker not ok'); process.exit(1); }
+          if (x.mode !== 'live') { console.error(`worker mode is ${x.mode}, expected live`); process.exit(1); }
+          console.log(`worker healthy revision=${x.revision} mode=${x.mode}`);
+          NODE
+
+      - name: Run all evidence lanes (commits, feeds, forum, mailinglist, releases, discovery)
+        shell: bash
+        run: |
+          set -uo pipefail
+          LANES="commits feeds forum mailinglist releases discovery"
+          FAILED=0
+          for lane in $LANES; do
+            echo "::group::Lane: $lane"
+            STATUS="$(curl -sS -o "lane-${lane}.json" -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/${lane}" || true)"
+            cat "lane-${lane}.json" || true
+            if [ "$STATUS" != "200" ]; then
+              echo "Lane ${lane} returned HTTP ${STATUS}" >&2
+              FAILED=$((FAILED + 1))
+            fi
+            echo "::endgroup::"
+          done
+
+      - name: Run analysis executor
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "::group::Analysis executor"
+          STATUS="$(curl -sS -o analysis-execute.json -w '%{http_code}' -X POST -H "Authorization: Bearer ${ADMIN_TOKEN}" "$WORKER_URL/run/analysis-execute" || true)"
+          cat analysis-execute.json || true
+          if [ "$STATUS" != "200" ]; then
+            echo "Analysis executor returned HTTP ${STATUS}" >&2
+          fi
+          echo "::endgroup::"
+
+      - name: Summary
+        if: always()
+        shell: bash
+        run: |
+          set -uo pipefail
+          echo "## Runtime sweep summary" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          for lane in commits feeds forum mailinglist releases discovery; do
+            if [ -f "lane-${lane}.json" ]; then
+              node -e "const x=require('./lane-${lane}.json');console.log('- **${lane}**: mode='+x.mode+' count='+x.count+' hasMore='+x.hasMore+' lane='+x.lane)" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "- **${lane}**: (parse failed)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "- **${lane}**: (no response)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
+          if [ -f analysis-execute.json ]; then
+            node -e "const x=require('./analysis-execute.json');console.log('- **analysis-execute**: processed='+x.processed+' results='+x.results.length)" >> "$GITHUB_STEP_SUMMARY" 2>/dev/null || echo "- **analysis-execute**: (parse failed)" >> "$GITHUB_STEP_SUMMARY"
+          fi

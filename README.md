@@ -24,6 +24,7 @@ GitHub bleibt die revisionssichere Code-/CI-Quelle. Notion Free bleibt Forschung
 - technische und mediale RSS-/Atom-Signale: alle 30 Minuten (`*/30 * * * *`)
 - Forum-/Claim-Discovery: alle 2 Stunden (`23 */2 * * *`)
 - Analyse-Executor (auto-quellentriangulation): alle 4 Stunden (`3 */4 * * *`)
+- **Wiederkehrender Runtime-Sweep**: alle 30 Minuten via GitHub-Actions-Workflow `recurring-sweep.yml` — ruft der Reihe nach `commits`, `feeds`, `forum`, `mailinglist`, `releases`, `discovery` und `analysis-execute` gegen den live Worker auf
 - Bitcoin-Core-Vollhistorie: nur über den geschützten manuellen `backfill`-Lauf
 
 ## Wahrheitsregel
