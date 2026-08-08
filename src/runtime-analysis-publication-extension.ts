@@ -1,4 +1,5 @@
 import { NOTION_TARGETS } from "./consent.js"
+import { isAuthorized } from "./auth.js"
 import type { AnalysisTask } from "./domain/types.js"
 import { upsertAnalysisResultToNotion, type PublishableAnalysisResult } from "./notion-analysis-results.js"
 import { addReceipt, type D1Database } from "./storage.js"
@@ -41,13 +42,6 @@ export interface AnalysisPublicationRecord {
   notionPageId: string
   notionReadbackAt: string
   reused: boolean
-}
-
-function authorized(request: Request, env: Env): boolean {
-  const configured = env.ADMIN_TOKEN?.trim()
-  if (!configured) return false
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  return supplied === configured
 }
 
 function requireLiveNotionToken(env: Env): string {
@@ -194,7 +188,7 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
   }
 
   if (request.method === "POST" && url.pathname === "/analysis/publish") {
-    if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 })
+    if (!isAuthorized(request, env)) return new Response("Unauthorized", { status: 401 })
     try {
       const body = await parseSmallJson(request)
       const publication = await publishStoredAnalysisResult(env, taskIdFrom(body.taskId))

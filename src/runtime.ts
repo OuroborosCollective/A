@@ -1,3 +1,4 @@
+import { isAuthorized } from "./auth.js"
 import {
   collectCommitBackfillPage,
   collectCommitPage,
@@ -50,6 +51,7 @@ export type Lane =
   | "commoncrawl"
   | "feeds"
   | "forum"
+  | "mailinglist"
   | "backfill"
 
 export interface Env {
@@ -300,6 +302,9 @@ export async function runLane(lane: Lane, env: Env): Promise<{ lane: Lane; mode:
     if (currentMode === "live") await putState(env.DB, lane, page.nextState)
     return { lane, mode: currentMode, count: page.records.length, hasMore: page.hasMore }
   }
+  if (lane === "mailinglist") {
+    throw new Error("mailinglist lane is served by the mailing-list runtime extension, not by runLane")
+  }
 
   const state = await getState<CommitBackfillState>(env.DB, lane)
   const page = await collectCommitBackfillPage(state, env.GITHUB_TOKEN)
@@ -325,11 +330,24 @@ export async function scheduled(controller: ScheduledLike, env: Env): Promise<vo
   await runLane(lane, env)
 }
 
-function authorized(request: Request, env: Env): boolean {
-  const configured = env.ADMIN_TOKEN?.trim()
-  if (!configured) return false
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  return supplied === configured
+export const RUNNABLE_LANES: readonly Lane[] = [
+  "commits", "releases", "discovery", "wayback", "sourceforge",
+  "wikipedia", "commoncrawl", "feeds", "forum", "mailinglist", "backfill",
+]
+
+function laneError(lane: Lane, error: unknown, env: Env): Promise<Response> {
+  const message = error instanceof Error ? error.message : String(error)
+  return addReceipt(env.DB, {
+    runId: crypto.randomUUID(),
+    lane,
+    action: "run-failed",
+    target: "cloudflare-worker",
+    status: "failure",
+    details: message.slice(0, 500),
+  }).then(() => Response.json(
+    { ok: false, error: "lane-failed", lane, message },
+    { status: 500 }
+  ))
 }
 
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
@@ -338,17 +356,26 @@ export async function handleFetch(request: Request, env: Env): Promise<Response>
     return Response.json({ ok: true, mode: mode(env), revision: env.REVISION ?? "unknown", notionTargets: Object.values(NOTION_TARGETS) })
   }
   if (request.method === "GET" && url.pathname === "/analysis/pending") {
-    if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 })
+    if (!isAuthorized(request, env)) return new Response("Unauthorized", { status: 401 })
     const limit = Number(url.searchParams.get("limit") ?? "25")
     const tasks: AnalysisTask[] = await listPendingAnalysisTasks(env.DB, Number.isFinite(limit) ? limit : 25)
     return Response.json({ count: tasks.length, tasks })
   }
   if (request.method === "POST" && url.pathname.startsWith("/run/")) {
-    if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 })
+    if (!isAuthorized(request, env)) return new Response("Unauthorized", { status: 401 })
     const lane = url.pathname.slice("/run/".length) as Lane
-    const allowed: Lane[] = ["commits", "releases", "discovery", "wayback", "sourceforge", "wikipedia", "commoncrawl", "feeds", "forum", "backfill"]
-    if (!allowed.includes(lane)) return new Response("Unknown lane", { status: 404 })
-    return Response.json(await runLane(lane, env))
+    if (!(RUNNABLE_LANES as readonly string[]).includes(lane)) {
+      return new Response("Unknown lane", { status: 404 })
+    }
+    if (lane === "mailinglist" || lane === "feeds") {
+      // These lanes are served by the runtime extension that wraps this handler.
+      return new Response("Not found", { status: 404 })
+    }
+    try {
+      return Response.json(await runLane(lane, env))
+    } catch (error) {
+      return laneError(lane, error, env)
+    }
   }
   return new Response("Not found", { status: 404 })
 }

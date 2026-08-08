@@ -5,6 +5,7 @@ import { sha256Hex, stableJson } from "./domain/hash.js"
 import { calculateHype } from "./domain/research.js"
 import type { HypeSignal } from "./domain/types.js"
 import { NOTION_TARGETS } from "./consent.js"
+import { isAuthorized } from "./auth.js"
 import { upsertSignalToNotion } from "./notion-api.js"
 import { addReceipt, getRecordMeta, getState, putState, rememberRecord } from "./storage.js"
 import {
@@ -59,13 +60,6 @@ function requireNotionToken(env: Env): string {
   const token = env.NOTION_API_TOKEN?.trim()
   if (!token) throw new Error("AUTONOMY_MODE=live requires NOTION_API_TOKEN")
   return token
-}
-
-function authorized(request: Request, env: Env): boolean {
-  const configured = env.ADMIN_TOKEN?.trim()
-  if (!configured) return false
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  return supplied === configured
 }
 
 async function feedItemToSignal(feed: FeedDefinition, item: FeedItem, retrievedAt: string): Promise<HypeSignal> {
@@ -192,11 +186,13 @@ export async function runBoundedFeedLane(env: Env): Promise<{ lane: string; mode
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
   if (request.method === "POST" && url.pathname === "/run/feeds") {
-    if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 })
+    if (!isAuthorized(request, env)) return new Response("Unauthorized", { status: 401 })
     try {
       return Response.json(await runBoundedFeedLane(env))
     } catch (error) {
-      return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 })
+      const message = error instanceof Error ? error.message : String(error)
+      await addReceipt(env.DB, { runId: crypto.randomUUID(), lane: LANE, action: "run-failed", target: "cloudflare-worker", status: "failure", details: message.slice(0, 500) })
+      return Response.json({ ok: false, error: "lane-failed", lane: LANE, message }, { status: 500 })
     }
   }
   return mailingListHandleFetch(request, env)

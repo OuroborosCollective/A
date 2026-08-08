@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface WikipediaSeed {
   language: string
   title: string
@@ -63,7 +65,7 @@ export async function fetchWikipediaReferencePage(seed: WikipediaSeed): Promise<
   endpoint.searchParams.set("llprop", "url|langname")
   endpoint.searchParams.set("origin", "*")
 
-  const response = await fetch(endpoint, {
+  const response = await fetchWithRetry(endpoint, {
     headers: {
       "User-Agent": "OuroborosCollective-Satoshi-Research-Worker/0.3 (public research; contact via GitHub OuroborosCollective/A)",
       "Accept": "application/json",

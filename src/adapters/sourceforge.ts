@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface SourceForgeSeed {
   apiUrl: string
   publicUrl: string
@@ -109,7 +111,7 @@ export function parseSourceForgeRest(payload: unknown, seed: SourceForgeSeed): S
 }
 
 export async function fetchSourceForgePage(seed: SourceForgeSeed): Promise<SourceForgePage> {
-  const response = await fetch(seed.apiUrl, {
+  const response = await fetchWithRetry(seed.apiUrl, {
     headers: {
       "User-Agent": "OuroborosCollective-Satoshi-Research-Worker/0.3",
       "Accept": "application/json",

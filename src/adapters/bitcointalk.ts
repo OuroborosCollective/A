@@ -1,4 +1,5 @@
 import { BITCOINTALK } from "../config.js"
+import { fetchWithRetry } from "./http-client.js"
 
 export interface BitcointalkPost {
   messageId: string
@@ -266,7 +267,7 @@ export function parseBitcointalkPosts(
 }
 
 async function fetchHtml(url: string): Promise<string> {
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     headers: {
       Accept: "text/html,application/xhtml+xml",
       "User-Agent": "OuroborosCollective-SatoshiResearch/0.2 (+public historical research; low-rate collector)",

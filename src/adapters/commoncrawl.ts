@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface CommonCrawlCapture {
   collection: string
   url: string
@@ -63,7 +65,7 @@ export async function fetchCommonCrawlCaptures(
   endpoint.searchParams.set("collapse", "digest")
   endpoint.searchParams.set("limit", String(Math.max(1, Math.min(5, Math.floor(limit)))))
 
-  const response = await fetch(endpoint, {
+  const response = await fetchWithRetry(endpoint, {
     headers: {
       "User-Agent": "OuroborosCollective-Satoshi-Research-Worker",
       "Accept": "application/x-ndjson,text/plain,application/json",
