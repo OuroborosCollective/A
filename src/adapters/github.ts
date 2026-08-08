@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface GitHubCommit {
   sha: string
   html_url: string
@@ -53,7 +55,7 @@ export async function fetchBitcoinCoreCommits(input: {
   url.searchParams.set("page", String(input.page))
   url.searchParams.set("per_page", String(input.perPage ?? 25))
 
-  const response = await fetch(url, { headers: headers(input.token) })
+  const response = await fetchWithRetry(url, { headers: headers(input.token) })
   if (!response.ok) throw new Error(`GitHub commits request failed: ${response.status}`)
   const commits = (await response.json()) as GitHubCommit[]
   return {
@@ -63,7 +65,7 @@ export async function fetchBitcoinCoreCommits(input: {
 }
 
 export async function fetchBitcoinCoreReleases(token?: string): Promise<GitHubRelease[]> {
-  const response = await fetch(
+  const response = await fetchWithRetry(
     "https://api.github.com/repos/bitcoin/bitcoin/releases?per_page=20",
     { headers: headers(token) }
   )

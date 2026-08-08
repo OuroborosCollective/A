@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface CryptographyMailSeed {
   url: string
   expectedAuthor?: string
@@ -154,7 +156,7 @@ async function readBoundedText(response: Response): Promise<string> {
 }
 
 export async function fetchCryptographyMail(seed: CryptographyMailSeed): Promise<CryptographyMailMessage> {
-  const response = await fetch(seed.url, {
+  const response = await fetchWithRetry(seed.url, {
     headers: { "user-agent": "OuroborosCollective-SatoshiResearch/0.2 (+public-evidence-research)" },
   })
   if (!response.ok) throw new Error(`Cryptography mailing-list fetch failed: ${response.status} ${seed.url}`)

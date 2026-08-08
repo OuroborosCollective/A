@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface FeedItem {
   id: string
   title: string
@@ -7,7 +9,7 @@ export interface FeedItem {
 }
 
 export async function fetchFeed(url: string): Promise<FeedItem[]> {
-  const response = await fetch(url, {
+  const response = await fetchWithRetry(url, {
     headers: { "User-Agent": "OuroborosCollective-Satoshi-Research-Worker" },
   })
   if (!response.ok) throw new Error(`Feed request failed (${response.status}): ${url}`)

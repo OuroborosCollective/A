@@ -4,6 +4,7 @@ import { canonicalSourceId } from "./domain/canonical.js"
 import { sha256Hex, stableJson } from "./domain/hash.js"
 import type { AnalysisTask, ClaimCandidate, FollowUpPlan, ResearchSource } from "./domain/types.js"
 import { NOTION_TARGETS } from "./consent.js"
+import { isAuthorized } from "./auth.js"
 import { upsertClaimToNotion, upsertFollowUpPlanToNotion, upsertSourceToNotion } from "./notion-api.js"
 import {
   addReceipt,
@@ -30,13 +31,6 @@ function requireNotionToken(env: Env): string {
   const token = env.NOTION_API_TOKEN?.trim()
   if (!token) throw new Error("AUTONOMY_MODE=live requires NOTION_API_TOKEN")
   return token
-}
-
-function authorized(request: Request, env: Env): boolean {
-  const configured = env.ADMIN_TOKEN?.trim()
-  if (!configured) return false
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  return supplied === configured
 }
 
 function compact(value: string, max = 1400): string {
@@ -219,9 +213,13 @@ export async function runMailingListLane(env: Env): Promise<{ lane: string; mode
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
   if (request.method === "POST" && url.pathname === "/run/mailinglist") {
-    if (!authorized(request, env)) return new Response("Unauthorized", { status: 401 })
+    if (!isAuthorized(request, env)) return new Response("Unauthorized", { status: 401 })
     try { return Response.json(await runMailingListLane(env)) }
-    catch (error) { return Response.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 }) }
+    catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      await addReceipt(env.DB, { runId: crypto.randomUUID(), lane: LANE, action: "run-failed", target: "cloudflare-worker", status: "failure", details: message.slice(0, 500) })
+      return Response.json({ ok: false, error: "lane-failed", lane: LANE, message }, { status: 500 })
+    }
   }
   return baseHandleFetch(request, env)
 }

@@ -18,10 +18,12 @@ GitHub bleibt die revisionssichere Code-/CI-Quelle. Notion Free bleibt Forschung
 
 ## Autonome Lanes
 
-- Bitcoin-Core-Commits: alle 15 Minuten
-- Bitcoin-Core-Releases: stündlich
-- historische Wayback/CDX-Captures: alle 6 Stunden
-- technische und mediale RSS-/Atom-Signale: alle 30 Minuten
+- Bitcoin-Core-Commits: alle 15 Minuten (`*/15 * * * *`)
+- Bitcoin-Core-Releases: stündlich (`7 * * * *`)
+- historische Discovery (Wayback/Wikipedia/Common Crawl/Mailingliste): alle 6 Stunden (`17 */6 * * *`)
+- technische und mediale RSS-/Atom-Signale: alle 30 Minuten (`*/30 * * * *`)
+- Forum-/Claim-Discovery: alle 2 Stunden (`23 */2 * * *`)
+- Analyse-Executor (auto-quellentriangulation): alle 4 Stunden (`3 */4 * * *`)
 - Bitcoin-Core-Vollhistorie: nur über den geschützten manuellen `backfill`-Lauf
 
 ## Wahrheitsregel
@@ -32,10 +34,10 @@ Ein Feed-Eintrag, Medienbericht, Archivcapture oder hoher Hype-Wert beweist kein
 
 ## Consent- und Sicherheitsgrenze
 
-Die Standing Authority `research-archive-v1` erlaubt ausschließlich:
+Die Standing Authority `research-archive-v3` erlaubt ausschließlich:
 
 - öffentliche Quellen lesen;
-- neue oder aktualisierte Forschungsdatensätze in genau zwei fest gebundene Notion-Data-Sources schreiben;
+- neue oder aktualisierte Forschungsdatensätze in genau fünf fest gebundene Notion-Data-Sources schreiben (Quellenarchiv, Hype-Signale, Claims & Evidence Ledger, Informationsfamilien & Folgesuchpfade, reproduzierbare Analyseergebnisse);
 - die eigene Notion-Schreiboperation wieder rücklesen;
 - D1-Cursor, Dedupe-Datensätze und Action Receipts schreiben.
 
@@ -45,8 +47,11 @@ Explizit verboten sind Notion-Löschungen/Archivierungen, Schreiben außerhalb d
 
 - Quellen- und Entitätenarchiv: `a7569cee-15e1-4847-845c-5317614ce370`
 - BTC Hype & Aufmerksamkeitssignale: `9edf6d9c-8164-4263-adb7-b59229e920ac`
+- Claims & Evidence Ledger: `7ba3564e-c996-4ab7-ab9e-3bcaef89bbf3`
+- Informationsfamilien & Folgesuchpfade: `d091aa97-4bce-47de-9fe7-c23d52759dd5`
+- Reproduzierbare Analyseergebnisse: `7a86f38f-aac0-43c5-a602-a6f5a4b28124`
 
-Diese IDs sind keine Geheimnisse; sie sind absichtlich als harte Resource Boundary im Code gebunden.
+Diese IDs sind keine Geheimnisse; sie sind absichtlich als harte Resource Boundary im Code gebunden (`src/consent.ts`).
 
 ## Lokal prüfen
 
@@ -69,7 +74,12 @@ Der Workflow findet oder erzeugt die D1-Datenbank `satoshi-research`, spielt die
 ## HTTP-Oberfläche
 
 - `GET /health` — secret-freier Runtime-Status
-- `POST /run/commits|releases|wayback|feeds|backfill` — nur mit `Authorization: Bearer <ADMIN_TOKEN>`
+- `POST /run/commits|releases|discovery|wayback|sourceforge|wikipedia|commoncrawl|feeds|forum|mailinglist|backfill` — nur mit `Authorization: Bearer <ADMIN_TOKEN>`
+- `POST /run/analysis-execute` — arbeitet ausstehende `research:source-triangulation`-Tasks (ohne Human Review) automatisch ab und persistiert reproduzierbare Ergebnisse
+- `GET /analysis/pending` — ausstehende Analyse-Tasks auflisten (geschützt)
+- `POST /analysis/claim` / `POST /analysis/complete` / `POST /analysis/release` — geschützter Claim-/Completion-/Release-Lebenszyklus für externe Executors
+- `GET /analysis/result?taskId=...` — gespeichertes Analyseergebnis lesen (geschützt)
+- `POST /analysis/publish` — reproduzierbares Analyseergebnis nach Notion publizieren und rücklesen (nur live)
 
 Ohne `ADMIN_TOKEN` ist die manuelle Mutationsoberfläche vollständig gesperrt; Cron-Läufe funktionieren unabhängig davon.
 

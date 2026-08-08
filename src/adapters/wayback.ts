@@ -1,3 +1,5 @@
+import { fetchWithRetry } from "./http-client.js"
+
 export interface WaybackCapture {
   timestamp: string
   original: string
@@ -17,7 +19,7 @@ export async function fetchWaybackCaptures(url: string): Promise<WaybackCapture[
   endpoint.searchParams.set("to", "2012")
   endpoint.searchParams.set("limit", "100")
 
-  const response = await fetch(endpoint, {
+  const response = await fetchWithRetry(endpoint, {
     headers: { "User-Agent": "OuroborosCollective-Satoshi-Research-Worker" },
   })
   if (!response.ok) throw new Error(`Wayback CDX request failed: ${response.status}`)

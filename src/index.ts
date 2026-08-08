@@ -1,4 +1,4 @@
-import { handleFetch, scheduled, type Env, type ScheduledLike } from "./runtime-analysis-publication-extension.js"
+import { handleFetch, scheduled, type Env, type ScheduledLike } from "./runtime-analysis-executor-extension.js"
 
 export default {
   fetch(request: Request, env: Env): Promise<Response> {

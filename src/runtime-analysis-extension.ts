@@ -1,5 +1,6 @@
 import { sha256Hex, stableJson } from "./domain/hash.js"
 import type { AnalysisTask } from "./domain/types.js"
+import { isAuthorized } from "./auth.js"
 import { addReceipt, type D1Database } from "./storage.js"
 import {
   handleFetch as feedHandleFetch,
@@ -68,13 +69,6 @@ interface ResultRow {
   evidence_refs_json: string
   result_sha256: string
   completed_at: string
-}
-
-function authorized(request: Request, env: Env): boolean {
-  const configured = env.ADMIN_TOKEN?.trim()
-  if (!configured) return false
-  const supplied = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim()
-  return supplied === configured
 }
 
 function errorResponse(status: number, error: string): Response {
@@ -295,7 +289,7 @@ async function getAnalysisResult(db: D1Database, taskId: string): Promise<Analys
 export async function handleFetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url)
   const analysisRoute = url.pathname.startsWith("/analysis/")
-  if (analysisRoute && !authorized(request, env)) return new Response("Unauthorized", { status: 401 })
+  if (analysisRoute && !isAuthorized(request, env)) return new Response("Unauthorized", { status: 401 })
 
   if (request.method === "POST" && url.pathname === "/analysis/claim") {
     try {

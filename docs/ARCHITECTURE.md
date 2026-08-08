@@ -17,8 +17,11 @@ Ein erfolgreicher HTTP-Status belegt nur den Abruf. `Record SHA-256` hasht den n
 |---|---|---:|---|
 | Bitcoin-Core-Commits | GitHub REST | 15 Minuten | Quellenarchiv |
 | Bitcoin-Core-Releases | GitHub REST | 1 Stunde | Quellenarchiv |
-| historische Webcaptures | Internet Archive CDX | 6 Stunden | Quellenarchiv |
-| technische und mediale Feeds | RSS/Atom | 15 Minuten | Hype-Signale |
+| historische Discovery (Wayback/Wikipedia/Common Crawl/Mailingliste) | CDX/MediaWiki/CC-Index/MetzDowd | 6 Stunden | Quellenarchiv |
+| Forum-/Claim-Discovery | Bitcointalk HTML | 2 Stunden | Quellenarchiv + Claims |
+| technische und mediale Feeds | RSS/Atom | 30 Minuten | Hype-Signale |
+| Analyse-Executor | D1-Queue (research) | 4 Stunden | Analyseergebnisse |
+| Backfill | GitHub REST | manuell | Quellenarchiv |
 
 ## Zustandsmodell
 
